@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Dashboard } from "@/components/Dashboard";
 import { SearchFilters } from "@/components/SearchFilters";
+import { DocumentAnalysis } from "@/components/DocumentAnalysis";
 import NotFound from "@/pages/not-found";
 
 // todo: remove mock functionality
@@ -41,6 +42,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/cases" component={CasesPage} />
       <Route path="/jurisprudence" component={JurisprudencePage} />
+      <Route path="/document-analysis" component={DocumentAnalysis} />
       <Route path="/doctrine" component={() => 
         <div className="p-6">
           <h1 className="text-2xl font-bold mb-4">Doctrina Legal</h1>

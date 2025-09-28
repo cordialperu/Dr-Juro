@@ -12,7 +12,8 @@ import {
   Users,
   Clock,
   CreditCard,
-  Shield
+  Shield,
+  Brain
 } from "lucide-react"
 import {
   Sidebar,
@@ -43,6 +44,12 @@ const menuItems = [
     title: "Jurisprudencia",
     url: "/jurisprudence",
     icon: Scale,
+  },
+  {
+    title: "Análisis de Documentos",
+    url: "/document-analysis",
+    icon: Brain,
+    badge: "IA"
   },
   {
     title: "Doctrina",
