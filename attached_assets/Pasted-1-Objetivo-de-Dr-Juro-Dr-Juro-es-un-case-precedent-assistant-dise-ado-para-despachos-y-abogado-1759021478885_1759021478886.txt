@@ -1,0 +1,216 @@
+1) Objetivo de Dr. Juro
+
+Dr. Juro es un case & precedent assistant diseñado para despachos y abogados en Perú que:
+
+Gestiona expedientes (matters) y clientes.
+
+Permite búsqueda avanzada y comparación automática de tu caso contra jurisprudencia peruana (Corte Suprema, Cortes Superiores, Tribunal Constitucional, Sala Penal Nacional, acuerdos plenarios, ejecutorias vinculantes) y doctrina (artículos, tesis, libros, tesis universitarias). 
+jurisprudencia.pj.gob.pe
++2
+pj.gob.pe
++2
+
+Señala artículos aplicables del Código Civil y Código Penal y mapea coincidencias por artículo y doctrina. 
+spijlibre.minjus.gob.pe
++1
+
+Ofrece explicaciones automáticas, extractos citables y confianza / fuentes por resultado.
+
+Cumple con la Ley de Protección de Datos Personales (Ley N° 29733) para el tratamiento de datos de clientes. 
+leyes.congreso.gob.pe
+
+2) Arquitectura funcional (alto nivel)
+
+Frontend web: SPA en español (sidebar/topbar/main). Interfaz orientada a abogados (filtros por sala, fecha, tipo de resolución, grado de vinculancia).
+
+Mobile apps (iOS/Android): mensajería segura, alertas de precedentes nuevos, búsquedas rápidas y vista de análisis.
+
+Backend: microservicios — API REST + GraphQL para búsquedas complejas; cola de procesamiento para indexación y modelos de IA; datastore relacional + blob store.
+
+Indexador legal: motor de texto (Elastic/OpenSearch) con campos estructurados (tribunal, sala, fecha, grado de vinculancia, artículos citados). 
+jurisprudencia.pj.gob.pe
++1
+
+Módulos IA: embeddings semánticos para similitud de casos, extractor de citas y artículos, clasificadores de relevancia y generador explicable de “argumento AI” (resumen + por qué aplica).
+
+3) Interfaz / pestañas principales (UX replicable)
+
+Sidebar: Dashboard, Expedientes (Cases), Jurisprudencia, Doctrina, Búsqueda Avanzada, Calendario, Tareas, Documentos, Facturación, Configuración (Firmas, Roles), Auditoría.
+
+Vista de Expediente (Case view) — pestañas internas:
+
+Resumen / Overview (estado, resumen AI del caso).
+
+Timeline / Activity.
+
+Jurisprudencia Relevante (lista ordenada por vinculancia y similitud).
+
+Doctrina Relevante (artículos, tesis, párrafos citables).
+
+Documentos (vinculación automática de resoluciones).
+
+Tareas / Time & Billing.
+
+Cliente / Portal (opcional, con acceso limitado).
+
+Vista Jurisprudencia — filtros:
+
+Tribunal (Corte Suprema, Tribunal Constitucional, Cortes Superiores, Sala Penal Nacional), Sala/Sección, fecha, keywords, artículos invocados, grado (ejecutorias vinculantes, acuerdos plenario, jurisprudencia uniforme, etc.). 
+pj.gob.pe
++1
+
+4) Modelo de datos (añadidos clave para Perú)
+
+Además de las entidades estándar (User, Firm, Case, Contact, Document, Message, Task, Invoice):
+
+Precedent: id, tribunal, sala, fecha, expediente, tipo_resolucion (ejecutoria_vinculante/plenario/relevante), resumen, texto_completo, artículos_citados[], doctrinas_citadas[], enlaces_oficiales. 
+jurisprudencia.pj.gob.pe
++1
+
+Doctrina: id, autor, obra, año, extracto, palabras_clave, link_repositorio (PUCP, UNMSM, repositorios nacionales). 
+LP
++1
+
+CitationMatch: case_id, precedent_id, article_matched, match_confidence, excerpt, match_type (texto_exacto, interpretación, ratio).
+
+LegalArticle: code (Civil/Penal), book/part, article_number, text, consolidated_updates, related_jurisprudence[]. 
+spijlibre.minjus.gob.pe
++1
+
+5) Flujos críticos (cómo usa el abogado Dr. Juro)
+
+Alta caso → análisis AI: Subes hechos (o dictas con voz) → NLP extrae hechos, delitos/pretensiones y artículos potenciales → busca precedentes y doctrina, devuelve ranking con justificación y fragmentos citables.
+
+Comparación automática: El sistema genera una “hoja comparativa” que empareja hechos del expediente con hechos probados en sentencias (matching semántico y sintáctico), y marca correspondencias por artículo.
+
+Evolución jurisprudencial: línea de tiempo que muestra cómo ha cambiado la interpretación de un artículo (decisiones clave, fechas y salas).
+
+Generación de memos: plantilla automática con argumentos favorables y contrarios (incluye citas y enlaces oficiales para copiar/pegar en escritos).
+
+Alertas: watchlists por artículo/tema — notifica nuevas decisiones relevantes.
+
+6) Módulos IA — diseño y explicación
+
+Pipeline NLP legal (ES):
+
+Preprocesado: normalización jurídica, eliminación de boilerplate.
+
+OCR + OCR legal post-processing para PDFs de sentencias.
+
+NER legal (hechos, partes, delitos, normas citadas).
+
+Extractor de citas (detecta y normaliza referencias a artículos y precedentes).
+
+Embeddings semánticos entrenados/fine-tuned en corpus jurídico peruano (sentencias + doctrina) para similitud de casos.
+
+Ranking & explainability:
+
+Score compuesto por: similitud semántica (embedding), coincidencia de artículos, grado de vinculancia (ejecutoria/plenario > reciente sala), autoridad del tribunal, y cobertura doctrinal.
+
+Cada resultado muestra: fragmento de sentencia + por qué aplica (3 bullets) + porcentaje de confianza + fuente oficial y link.
+
+Contra-argumentador automático:
+
+Genera contra-argumentos y propone cómo distinguir tu caso (diferencias fácticas y jurídicas), útil para escritos y apelaciones.
+
+Caveat legal & trazabilidad:
+
+Todas las recomendaciones AI deben venir con “rationale” y lista de fuentes; el usuario puede ver raw evidence (extractos, enlaces oficiales).
+
+7) Integración con fuentes oficiales peruanas
+
+Indexado y sync automático (crawler legal autorizado / acuerdos) con:
+
+Jurisprudencia Sistematizada del Poder Judicial (Corte Suprema y Cortes Superiores). 
+jurisprudencia.pj.gob.pe
++1
+
+Sentencias y resoluciones del Tribunal Constitucional. 
+tc.gob.pe
+
+Repositorios universitarios y revistas (PUCP, tesis, doctrina). 
+LP
++1
+
+Textos consolidados del Código Civil / Penal y sus actualizaciones oficiales (SPiJ / Minjus). 
+spijlibre.minjus.gob.pe
++1
+
+(Implementar acuerdos legales/robots.txt y atribución; usar fuentes oficiales y mostrar enlaces a las resoluciones originales.)
+
+8) Compliance peruano — privacidad y protección de datos
+
+Dr. Juro debe cumplir Ley N° 29733 (Protección de Datos Personales) y su reglamento: consentimiento informado, finalidad limitada, minimización, portabilidad y derechos ARCO; registro ante la Autoridad Nacional de Protección de Datos Personales si corresponde. 
+leyes.congreso.gob.pe
++1
+
+Opciones configurables: almacenamiento en datacenter local (Perú) o cifrado + cláusulas de transferencia internacional con garantías contractuales; pseudonimización de datos sensibles; logs de acceso y auditoría forense.
+
+Módulo de gestión de consentimientos para clientes y clausulado en contratos/engagement letters.
+
+9) Calidad y gobernanza del corpus legal
+
+Pipeline de ingestión con control de calidad: detección de duplicados, versionado de sentencias (diferenciar autos de sentencia), metadatos obligatorios (tribunal, sala, fecha, expediente).
+
+Equipo de curaduría legal para etiquetado (juristas) + feedback loop con usuarios (votos de relevancia) que retroalimenta modelos.
+
+Política de retención de documentos y casos conforme a normas de conservación.
+
+10) API / Webhooks (esquema resumido)
+
+POST /cases/{id}/analyze → devuelve matches (precedents[], doctrina[], articles[]) con scores y extracts.
+
+GET /precedents?filters=tribunal,sala,articulo,type,date_range
+
+POST /watchlists → webhook precedent.created / precedent.updated para alertas.
+
+Auth: OAuth2 + scopes; registros de auditoría (who accessed qué fragmento y cuándo) para trazabilidad legal.
+
+11) UX microinteractions legales (detalles que marcan la diferencia)
+
+Mostrar grado de vinculancia con iconografía clara (plenario = 🏛️ alto; ejecutoria vinculante = 🔒; jurisprudencia uniforme = ✔️). 
+pj.gob.pe
+
+“Cita rápida” que genera texto listo para incorporar al escrito con referencia formal (expediente, fecha, sala) y link oficial.
+
+Versión imprimible del memo AI con bibliografía y anexos.
+
+Modo “auditoría” para revisores: ver cambios propuestos por IA y aprobar/rechazar (control humano).
+
+12) Roadmap MVP (prioridad Perú)
+
+Core: Users, Cases, Documents, Search básico.
+
+Ingesta y indexación de jurisprudencia oficial (Poder Judicial + TC). 
+jurisprudencia.pj.gob.pe
++1
+
+Módulo IA 1.0: extracción de artículos citados + similitud básica (embeddings) + ranking.
+
+Módulo de generación de memos y watchlists.
+
+Compliance y módulo de consentimiento (Ley 29733). 
+leyes.congreso.gob.pe
+
+13) Riesgos y mitigaciones
+
+Riesgo: Sesgo o recomendaciones incorrectas de la IA → Mitigación: explicar rationale, incluir fuente primaria, mandatory human-in-loop para documentos presentados al juzgado.
+
+Riesgo: Violación de datos sensibles → Mitigación: cifrado, minimización, datacenter en Perú, gestión de consentimientos. 
+leyes.congreso.gob.pe
+
+Riesgo: Conflictos de licenciamiento con repositorios → Mitigación: acuerdos con Poder Judicial/TC/universidades y uso de enlaces a fuentes públicas cuando no haya permiso para full-text.
+
+14) Métricas clave a medir (KPI)
+
+Tiempo medio para encontrar precedente aplicable.
+
+Precision@10 del ranking de precedentes (retroalimentado por votos de abogados).
+
+Tasa de adopción de memos AI (descargas / ediciones humanas).
+
+Incidentes de privacidad / solicitudes ARCO.
+
+Resumen ejecutivo (1 línea)
+
+Dr. Juro es una plataforma peruana de gestión de expedientes que integra búsqueda jurídica nacional + doctrina y genera análisis explicables (por artículo del Código Civil y Penal), con módulos de IA diseñados para comparar hechos, producir memos citables y cumplir la Ley N° 29733
