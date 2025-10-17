@@ -47,7 +47,7 @@ const mockAnalysis: AnalysisResult = {
   confidence: 85,
   precedentsFound: 12,
   articlesMatched: ["Art. 1969 CC", "Art. 1970 CC", "Art. 1762 CC", "Art. 1321 CC"],
-  summary: "El análisis de IA indica una alta probabilidad de éxito en la demanda por daños y perjuicios. Se identificaron precedentes relevantes de la Corte Suprema que establecen la responsabilidad del constructor por defectos en la obra, incluso después de su entrega.",
+  summary: "El análisis indica una alta probabilidad de éxito en la demanda por daños y perjuicios. Se identificaron precedentes relevantes de la Corte Suprema que establecen la responsabilidad del constructor por defectos en la obra, incluso después de su entrega.",
   favorableArguments: [
     "Precedente vinculante CAS-2023-1845 establece responsabilidad objetiva del constructor",
     "Doctrina mayoritaria reconoce la extensión de garantía en contratos de obra",
@@ -84,7 +84,7 @@ export function AIAnalysisModal({ caseTitle, triggerButton }: AIAnalysisModalPro
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true)
-    // Simulate AI analysis
+    // Simulate analysis
     await new Promise(resolve => setTimeout(resolve, 3000))
     setAnalysis(mockAnalysis)
     setIsAnalyzing(false)
@@ -104,7 +104,7 @@ export function AIAnalysisModal({ caseTitle, triggerButton }: AIAnalysisModalPro
         {triggerButton || (
           <Button variant="outline" data-testid="button-ai-analysis">
             <Brain className="h-4 w-4 mr-2" />
-            Análisis con IA
+            Analizar caso
           </Button>
         )}
       </DialogTrigger>
@@ -112,7 +112,7 @@ export function AIAnalysisModal({ caseTitle, triggerButton }: AIAnalysisModalPro
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Brain className="h-5 w-5 text-primary" />
-            Análisis de IA: {caseTitle}
+            Análisis: {caseTitle}
           </DialogTitle>
           <DialogDescription>
             Análisis inteligente de precedentes, doctrina y probabilidad de éxito
@@ -126,7 +126,7 @@ export function AIAnalysisModal({ caseTitle, triggerButton }: AIAnalysisModalPro
                 <div className="space-y-4">
                   <Brain className="h-16 w-16 mx-auto text-muted-foreground" />
                   <p className="text-muted-foreground">
-                    Inicie el análisis de IA para obtener recomendaciones inteligentes
+                    Inicie el análisis para obtener recomendaciones
                     sobre precedentes, probabilidad de éxito y estrategia legal.
                   </p>
                   <Button onClick={handleAnalyze} size="lg" data-testid="button-start-analysis">

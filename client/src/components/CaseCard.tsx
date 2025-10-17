@@ -1,3 +1,4 @@
+import { useLocation } from "wouter"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -10,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-interface CaseCardProps {
+export interface CaseCardProps {
   id: string
   title: string
   client: string
@@ -57,8 +58,23 @@ export function CaseCard({
   documentsCount,
   precedentsFound
 }: CaseCardProps) {
+  const [, navigate] = useLocation();
+  const handleOpen = () => navigate(`/cases/${id}`);
+
   return (
-    <Card className="hover-elevate" data-testid={`case-card-${id}`}>
+    <Card
+      className="hover-elevate cursor-pointer"
+      data-testid={`case-card-${id}`}
+      onClick={handleOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          handleOpen()
+        }
+      }}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
@@ -67,12 +83,26 @@ export function CaseCard({
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8" data-testid={`case-menu-${id}`}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                data-testid={`case-menu-${id}`}
+                onClick={(event) => event.stopPropagation()}
+              >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem data-testid={`case-view-${id}`}>Ver expediente</DropdownMenuItem>
+              <DropdownMenuItem
+                data-testid={`case-view-${id}`}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  handleOpen();
+                }}
+              >
+                Ver expediente
+              </DropdownMenuItem>
               <DropdownMenuItem data-testid={`case-edit-${id}`}>Editar</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem data-testid={`case-archive-${id}`}>Archivar</DropdownMenuItem>
@@ -114,21 +144,27 @@ export function CaseCard({
               <span className="text-card-foreground">{nextHearing}</span>
             </div>
           )}
-          
+
           <div className="flex items-center gap-2 text-sm">
             <Clock className="h-4 w-4 text-muted-foreground" />
             <span className="text-muted-foreground">Última actividad:</span>
             <span className="text-card-foreground">{lastActivity}</span>
           </div>
         </div>
-        
+
         <div className="flex items-center justify-between pt-2 border-t border-border">
           <div className="flex gap-4 text-sm text-muted-foreground">
             <span>{documentsCount} documentos</span>
             {precedentsFound && <span>{precedentsFound} precedentes</span>}
           </div>
-          <Button variant="outline" size="sm" data-testid={`case-open-${id}`}>
-            Abrir expediente
+          <Button
+            size="sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleOpen();
+            }}
+          >
+            Abrir Expediente
           </Button>
         </div>
       </CardContent>

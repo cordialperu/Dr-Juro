@@ -1,0 +1,369 @@
+import { useSelectedClient } from '@/contexts/ClientContext';
+import { useLocation, useRoute } from 'wouter';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Calendar } from '@/components/ui/calendar';
+import { DocumentFolderManager } from '@/components/DocumentFolderManager';
+import { 
+  ArrowLeft, 
+  User, 
+  FileText, 
+  Briefcase,
+  Calendar as CalendarIcon,
+  CheckCircle2,
+  Save,
+  AlertCircle
+} from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+
+// Definir las configuraciones de cada fase
+const FASE_CONFIG = {
+  registro: {
+    title: 'Registro del Cliente',
+    icon: User,
+    description: 'Información básica del cliente y datos de contacto',
+    color: 'blue',
+    fields: [
+      { name: 'name', label: 'Nombre Completo', type: 'text', required: true },
+      { name: 'contactInfo', label: 'Teléfono', type: 'text', required: true },
+      { name: 'email', label: 'Correo Electrónico', type: 'email', required: false },
+      { name: 'address', label: 'Dirección', type: 'text', required: false },
+      { name: 'dni', label: 'DNI/RUC', type: 'text', required: false },
+      { name: 'notes', label: 'Notas Adicionales', type: 'textarea', required: false },
+    ]
+  },
+    avance_investigacion: {
+    title: 'Avance de la Investigación',
+    icon: FileText,
+    description: 'Recopilación de documentos, notificaciones y denuncias',
+    color: 'yellow',
+    fields: [
+      { name: 'denunciaPolicial', label: 'Denuncia Policial', type: 'textarea', required: false, placeholder: 'Detalles de la denuncia policial' },
+      { name: 'notificaciones', label: 'Notificaciones Recibidas', type: 'textarea', required: false, placeholder: 'Lista de notificaciones judiciales' },
+      { name: 'documentosAdicionales', label: 'Documentos Adicionales', type: 'textarea', required: false, placeholder: 'Otros documentos relevantes' },
+      { name: 'fechaInicio', label: 'Fecha de Inicio', type: 'date', required: false },
+      { name: 'estadoInvestigacion', label: 'Estado de la Investigación', type: 'text', required: false, placeholder: 'En proceso, completada, etc.' },
+    ]
+  },
+  programar_cita: {
+    title: 'Programar Cita',
+    icon: CalendarIcon,
+    description: 'Agendar reunión con el cliente para definir estrategia',
+    color: 'green',
+    fields: [
+      { name: 'meetingDate', label: 'Fecha de la Cita', type: 'date', required: true },
+      { name: 'meetingTime', label: 'Hora', type: 'time', required: true },
+      { name: 'location', label: 'Lugar de Reunión', type: 'text', required: false, placeholder: 'Oficina, videollamada, etc.' },
+      { name: 'attendees', label: 'Asistentes', type: 'text', required: false, placeholder: 'Cliente, abogado, terceros' },
+      { name: 'agenda', label: 'Agenda de la Reunión', type: 'textarea', required: false, placeholder: 'Temas a tratar' },
+      { name: 'preparationNotes', label: 'Notas de Preparación', type: 'textarea', required: false, placeholder: 'Documentos a revisar, puntos clave' },
+    ]
+  },
+  armar_estrategia: {
+    title: 'Armar Estrategia',
+    icon: Briefcase,
+    description: 'Entender los hechos, desarrollar teoría del caso y definir objetivos',
+    color: 'orange',
+    fields: [
+      { name: 'entenderHechos', label: 'Entender los Hechos', type: 'textarea', required: true, placeholder: 'Cronología y descripción detallada de los hechos' },
+      { name: 'teoriaDelCaso', label: 'Teoría del Caso', type: 'textarea', required: true, placeholder: 'Narrativa legal que explica los hechos' },
+      { name: 'objetivos', label: 'Objetivos', type: 'textarea', required: true, placeholder: 'Qué se busca lograr con el caso' },
+      { name: 'fundamentoLegal', label: 'Fundamento Legal', type: 'textarea', required: false, placeholder: 'Leyes, artículos y precedentes aplicables' },
+      { name: 'estrategiaDefensa', label: 'Estrategia de Defensa/Acción', type: 'textarea', required: false, placeholder: 'Cómo se abordará el caso' },
+      { name: 'riesgos', label: 'Riesgos y Contingencias', type: 'textarea', required: false, placeholder: 'Posibles obstáculos y planes alternativos' },
+    ]
+  },
+  seguimiento: {
+    title: 'Seguimiento del Caso',
+    icon: CheckCircle2,
+    description: 'Monitorear el progreso y actualizaciones del proceso',
+    color: 'purple',
+    fields: [
+      { name: 'currentStatus', label: 'Estado Actual', type: 'text', required: true, placeholder: 'En trámite, en audiencia, resuelto, etc.' },
+      { name: 'lastUpdate', label: 'Última Actualización', type: 'date', required: false },
+      { name: 'proximaAudiencia', label: 'Próxima Audiencia', type: 'date', required: false, placeholder: 'Fecha de la próxima audiencia' },
+      { name: 'resolucionesEmitidas', label: 'Resoluciones Emitidas', type: 'textarea', required: false, placeholder: 'Resoluciones judiciales recibidas' },
+      { name: 'pendingTasks', label: 'Tareas Pendientes', type: 'textarea', required: false, placeholder: 'Documentos por presentar, gestiones pendientes' },
+      { name: 'observations', label: 'Observaciones', type: 'textarea', required: false, placeholder: 'Comentarios y notas adicionales' },
+    ]
+  }
+};
+
+export function ProcesoFasePage() {
+  const { selectedClient } = useSelectedClient();
+  const [, navigate] = useLocation();
+  const [, params] = useRoute('/proceso/:clientId/:fase');
+  const { toast } = useToast();
+
+  const fase = params?.fase as keyof typeof FASE_CONFIG || 'registro';
+  const config = FASE_CONFIG[fase];
+
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // useEffect para cargar texto consolidado de cada carpeta y auto-llenar textareas
+  useEffect(() => {
+    if (!selectedClient || fase === 'registro') return;
+
+    const loadConsolidatedTexts = async () => {
+      // Para cada campo que tiene una carpeta asignada
+      for (const field of config.fields as any[]) {
+        if (field.folder) {
+          try {
+            const response = await fetch(`/api/clients/${selectedClient.id}/documents/${fase}/${field.folder}/consolidated`);
+            if (response.ok) {
+              const data = await response.json();
+              if (data?.consolidatedText && data.consolidatedText.trim() !== '') {
+                console.log(`✅ Cargando texto consolidado para ${field.label}:`, data.consolidatedText.substring(0, 100) + '...');
+                setFormData(prev => ({
+                  ...prev,
+                  [field.name]: data.consolidatedText
+                }));
+              }
+            }
+          } catch (error) {
+            console.error(`Error cargando texto consolidado para ${field.folder}:`, error);
+          }
+        }
+      }
+    };
+
+    loadConsolidatedTexts();
+  }, [selectedClient?.id, fase]); // Re-cargar cuando cambia el cliente o fase
+
+  if (!selectedClient) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <AlertCircle className="h-16 w-16 text-muted-foreground" />
+        <div className="text-center space-y-2">
+          <h2 className="text-2xl font-bold">No hay cliente seleccionado</h2>
+          <p className="text-muted-foreground">
+            Selecciona un cliente desde la página de Clientes
+          </p>
+        </div>
+        <Button onClick={() => navigate('/clients')}>
+          <User className="h-4 w-4 mr-2" />
+          Ir a Clientes
+        </Button>
+      </div>
+    );
+  }
+
+  if (!config) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <AlertCircle className="h-16 w-16 text-destructive" />
+        <div className="text-center space-y-2">
+          <h2 className="text-2xl font-bold">Fase no encontrada</h2>
+          <p className="text-muted-foreground">
+            La fase "{fase}" no existe
+          </p>
+        </div>
+        <Button onClick={() => navigate('/seguimiento-casos')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Volver al Seguimiento
+        </Button>
+      </div>
+    );
+  }
+
+  const Icon = config.icon;
+
+  const handleInputChange = (name: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    
+    // Simular guardado (aquí se conectaría con la API)
+    setTimeout(() => {
+      setIsSaving(false);
+      toast({
+        title: "Cambios guardados",
+        description: `La información de la fase "${config.title}" ha sido guardada correctamente.`,
+      });
+    }, 1000);
+  };
+
+  return (
+    <div className="space-y-6 pb-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/seguimiento-casos')}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver al Seguimiento
+          </Button>
+          <div>
+            <div className="flex items-center gap-3">
+              <Icon className="h-8 w-8 text-primary" />
+              <h1 className="text-3xl font-bold">{config.title}</h1>
+            </div>
+            <p className="text-muted-foreground mt-1">{config.description}</p>
+          </div>
+        </div>
+        <Badge variant="outline" className="text-base">
+          Cliente: {selectedClient.name}
+        </Badge>
+      </div>
+
+      {/* Formulario de la Fase */}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            {fase === 'registro' ? 'Datos del Cliente' : 'Información de la Fase'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {config.fields.map((field) => (
+              <div 
+                key={field.name} 
+                className={field.type === 'textarea' ? 'md:col-span-2' : ''}
+              >
+                <Label htmlFor={field.name}>
+                  {field.label}
+                  {field.required && <span className="text-destructive ml-1">*</span>}
+                </Label>
+                {field.type === 'textarea' ? (
+                  <Textarea
+                    id={field.name}
+                    placeholder={`Ingrese ${field.label.toLowerCase()}`}
+                    value={formData[field.name] || ''}
+                    onChange={(e) => handleInputChange(field.name, e.target.value)}
+                    rows={4}
+                    className="mt-2"
+                  />
+                ) : field.name === 'meetingDate' ? (
+                  <div className="mt-2 space-y-4">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(date) => {
+                        setSelectedDate(date);
+                        if (date) {
+                          handleInputChange('meetingDate', date.toISOString().split('T')[0]);
+                        }
+                      }}
+                      disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                      className="rounded-md border"
+                    />
+                    {selectedDate && (
+                      <p className="text-sm text-muted-foreground">
+                        Fecha seleccionada: {selectedDate.toLocaleDateString('es-PE', { 
+                          weekday: 'long', 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <Input
+                    id={field.name}
+                    type={field.type}
+                    placeholder={`Ingrese ${field.label.toLowerCase()}`}
+                    value={formData[field.name] || ''}
+                    onChange={(e) => handleInputChange(field.name, e.target.value)}
+                    className="mt-2"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Botones de acción */}
+          <div className="flex items-center justify-between pt-6 border-t">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/seguimiento-casos')}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              size="lg"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Información adicional */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Instrucciones</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            {fase === 'registro' && (
+              <>
+                <p>• Esta fase se completa una sola vez durante el registro inicial del cliente.</p>
+                <p>• Puede volver a editar estos datos en cualquier momento si necesita actualizar la información de contacto.</p>
+                <p>• Los campos marcados con (*) son obligatorios.</p>
+              </>
+            )}
+            {fase === 'avance_investigacion' && (
+              <>
+                <p>• Recopile y documente denuncias policiales y notificaciones oficiales.</p>
+                <p>• Adjunte todos los documentos relacionados al caso en las carpetas correspondientes.</p>
+                <p>• Esta información es fundamental para entender el contexto del caso.</p>
+              </>
+            )}
+            {fase === 'programar_cita' && (
+              <>
+                <p>• Programe una reunión para presentar los hallazgos al cliente.</p>
+                <p>• Prepare la agenda con los temas clave a discutir.</p>
+                <p>• Asegúrese de tener todos los documentos necesarios listos.</p>
+              </>
+            )}
+            {fase === 'armar_estrategia' && (
+              <>
+                <p>• Analice los hechos del caso de manera cronológica y detallada.</p>
+                <p>• Desarrolle una teoría del caso sólida basada en la evidencia recopilada.</p>
+                <p>• Defina objetivos claros y realistas para el cliente.</p>
+              </>
+            )}
+            {fase === 'seguimiento' && (
+              <>
+                <p>• Mantenga un registro actualizado del estado del caso.</p>
+                <p>• Documente todas las resoluciones y próximas audiencias.</p>
+                <p>• Registre cualquier observación relevante sobre el progreso.</p>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sección de Documentos - Solo para fases que no sean registro */}
+      {fase !== 'registro' && (
+        <Card>
+          <CardContent className="pt-6">
+            <DocumentFolderManager 
+              clientId={selectedClient.id}
+              phase={fase}
+            />
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}

@@ -13,7 +13,8 @@ import {
   Clock,
   CreditCard,
   Shield,
-  Brain
+  Brain,
+  ClipboardList
 } from "lucide-react"
 import {
   Sidebar,
@@ -29,68 +30,62 @@ import {
 import { Badge } from "@/components/ui/badge"
 
 const menuItems = [
-  {
-    title: "Panel Principal",
-    url: "/",
-    icon: Home,
-  },
-  {
-    title: "Expedientes",
-    url: "/cases",
-    icon: Folder,
-    badge: "12"
-  },
-  {
-    title: "Jurisprudencia",
-    url: "/jurisprudence",
-    icon: Scale,
-  },
-  {
-    title: "Análisis de Documentos",
-    url: "/document-analysis",
-    icon: Brain,
-    badge: "IA"
-  },
-  {
-    title: "Doctrina",
-    url: "/doctrine",
-    icon: FileText,
-  },
-  {
-    title: "Búsqueda Avanzada",
-    url: "/search",
-    icon: Search,
-  },
-  {
-    title: "Calendario",
-    url: "/calendar",
-    icon: Calendar,
-  },
-  {
-    title: "Tareas",
-    url: "/tasks",
-    icon: Clock,
-    badge: "5"
-  },
+  // ACTIVOS - Funcionalidad principal
   {
     title: "Clientes",
     url: "/clients",
     icon: Users,
+    active: true,
   },
   {
-    title: "Facturación",
-    url: "/billing",
-    icon: CreditCard,
+    title: "Procesos",
+    url: "/procesos",
+    icon: ClipboardList,
+    active: true,
   },
   {
-    title: "Configuración",
-    url: "/settings",
-    icon: Settings,
+    title: "Meta Buscador",
+    url: "/metabuscador",
+    icon: Search,
+    active: true,
+  },
+  
+  // DESHABILITADOS - En desarrollo
+  {
+    title: "Panel Principal",
+    url: "#",
+    icon: Home,
+    disabled: true,
   },
   {
-    title: "Auditoría",
-    url: "/audit",
-    icon: Shield,
+    title: "Expedientes",
+    url: "#",
+    icon: Folder,
+    disabled: true,
+  },
+  {
+    title: "Jurisprudencia",
+    url: "#",
+    icon: Scale,
+    disabled: true,
+  },
+  {
+    title: "Análisis de Documentos",
+    url: "#",
+    icon: Brain,
+    disabled: true,
+  },
+  {
+    title: "Doctrina",
+    url: "#",
+    icon: FileText,
+    disabled: true,
+  },
+  {
+    title: "Tareas",
+    url: "#",
+    icon: Clock,
+    disabled: true,
   },
 ]
 
@@ -118,19 +113,23 @@ export function AppSidebar() {
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
-                    asChild 
+                    asChild={!item.disabled}
                     data-active={location === item.url}
                     data-testid={`nav-${item.title.toLowerCase().replace(/ /g, '-')}`}
+                    disabled={item.disabled}
+                    className={item.disabled ? "opacity-40 cursor-not-allowed" : ""}
                   >
-                    <a href={item.url} className="flex items-center gap-3">
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                      {item.badge && (
-                        <Badge variant="secondary" className="ml-auto">
-                          {item.badge}
-                        </Badge>
-                      )}
-                    </a>
+                    {item.disabled ? (
+                      <div className="flex items-center gap-3">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </div>
+                    ) : (
+                      <a href={item.url} className="flex items-center gap-3">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </a>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

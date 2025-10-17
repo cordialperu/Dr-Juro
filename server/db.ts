@@ -1,15 +1,23 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import pg from "pg";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
 
-neonConfig.webSocketConstructor = ws;
+const { Pool } = pg;
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
+const databaseUrl = process.env.DATABASE_URL;
+
+let poolInstance: pg.Pool | null = null;
+let dbInstance: NodePgDatabase<typeof schema> | null = null;
+
+if (databaseUrl) {
+  poolInstance = new Pool({ connectionString: databaseUrl });
+  dbInstance = drizzle(poolInstance, { schema });
+} else {
+  console.warn(
+    "DATABASE_URL no está configurado. Ejecutando en modo solo memoria.",
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
+export const pool = poolInstance;
+export const db = dbInstance;
+export const isDatabaseConfigured = () => dbInstance !== null;

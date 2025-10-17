@@ -149,7 +149,7 @@ export function DocumentAnalysis() {
           errorDescription = "No se pudo conectar con el servidor. Verifique su conexión a internet."
         } else if (error.message.includes('quota') || error.message.includes('429')) {
           errorTitle = "Servicio temporalmente no disponible"
-          errorDescription = "El servicio de IA ha alcanzado su límite. Se utilizará el sistema de análisis de respaldo."
+          errorDescription = "El servicio de análisis ha alcanzado su límite. Se utilizará el sistema de respaldo."
         }
       }
       
@@ -182,7 +182,7 @@ export function DocumentAnalysis() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Análisis de Documentos</h1>
           <p className="text-muted-foreground">
-            Analice documentos legales con IA y encuentre jurisprudencia peruana relacionada
+            Analice documentos legales y encuentre jurisprudencia peruana relacionada
           </p>
         </div>
       </div>
@@ -259,7 +259,7 @@ export function DocumentAnalysis() {
                 ) : (
                   <>
                     <Brain className="h-4 w-4 mr-2" />
-                    Analizar con IA
+                    Analizar documento
                   </>
                 )}
               </Button>
@@ -273,9 +273,9 @@ export function DocumentAnalysis() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Brain className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Análisis Inteligente</h3>
+                <h3 className="text-lg font-medium mb-2">Análisis Automatizado</h3>
                 <p className="text-muted-foreground mb-4">
-                  Suba un documento o ingrese texto para comenzar el análisis con IA
+                  Suba un documento o ingrese texto para comenzar el análisis
                 </p>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p>• Identificación automática de conceptos legales</p>
@@ -293,7 +293,7 @@ export function DocumentAnalysis() {
                 <Loader2 className="h-16 w-16 mx-auto animate-spin text-primary mb-4" />
                 <h3 className="text-lg font-medium mb-2">Procesando documento...</h3>
                 <p className="text-muted-foreground mb-4">
-                  La IA está analizando el contenido y buscando jurisprudencia relacionada
+                  Analizando el contenido y buscando jurisprudencia relacionada
                 </p>
                 <Progress value={66} className="w-64 mx-auto" />
                 <p className="text-xs text-muted-foreground mt-2">
