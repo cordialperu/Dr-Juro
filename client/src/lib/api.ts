@@ -168,7 +168,7 @@ export async function deleteCase(id: string): Promise<{ success: boolean }> {
 }
 
 export async function getProfile(): Promise<AuthProfile> {
-  const res = await fetch("/api/user/profile", {
+  const res = await fetch("/api/auth/profile", {
     ...withCredentials,
   });
   return handleResponse<AuthProfile>(res);
@@ -176,7 +176,7 @@ export async function getProfile(): Promise<AuthProfile> {
 
 export async function login(input: LoginInput): Promise<AuthProfile> {
   const headers = await getHeadersWithCsrf();
-  const res = await fetch("/api/user/login", {
+  const res = await fetch("/api/auth/login", {
     ...withCredentials,
     method: "POST",
     headers,
@@ -190,7 +190,7 @@ export async function login(input: LoginInput): Promise<AuthProfile> {
 }
 
 export async function register(input: LoginInput): Promise<AuthProfile> {
-  const res = await fetch("/api/user/register", {
+  const res = await fetch("/api/auth/register", {
     ...withCredentials,
     method: "POST",
     headers: defaultHeaders,
@@ -200,7 +200,7 @@ export async function register(input: LoginInput): Promise<AuthProfile> {
 }
 
 export async function logout(): Promise<void> {
-  const res = await fetch("/api/user/logout", {
+  const res = await fetch("/api/auth/logout", {
     ...withCredentials,
     method: "POST",
   });
