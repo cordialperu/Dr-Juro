@@ -22,6 +22,35 @@ if (databaseUrl) {
   );
 }
 
+// Auto-migrate: Create missing tables on startup
+async function autoMigrate() {
+  if (!poolInstance) return;
+  
+  const client = await poolInstance.connect();
+  try {
+    // Create legal_process_v2 table if not exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS legal_process_v2 (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        client_id VARCHAR NOT NULL UNIQUE REFERENCES clients(id) ON DELETE CASCADE,
+        data JSONB NOT NULL DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP DEFAULT now() NOT NULL
+      )
+    `);
+    console.log("✅ Auto-migrate: legal_process_v2 table ready");
+  } catch (error: any) {
+    console.warn("⚠️ Auto-migrate warning:", error.message);
+  } finally {
+    client.release();
+  }
+}
+
+// Run migration on module load
+if (poolInstance) {
+  autoMigrate().catch(console.error);
+}
+
 export const pool = poolInstance;
 export const db = dbInstance;
 export const isDatabaseConfigured = () => dbInstance !== null;
