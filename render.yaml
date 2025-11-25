@@ -12,7 +12,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: dr-juro-db
+          property: connectionString
       - key: SESSION_SECRET
         generateValue: true
       - key: JWT_SECRET
