@@ -18,6 +18,8 @@ export function registerAuthRoutes(router: Router) {
   router.post(
     "/auth/login",
     asyncHandler(async (req, res) => {
+      console.log("🔐 Login attempt for:", req.body?.username);
+      
       const parseResult = credentialsSchema.safeParse(req.body);
       if (!parseResult.success) {
         throw new HttpError(400, parseResult.error.issues.map((issue) => issue.message).join("; "));
@@ -25,18 +27,23 @@ export function registerAuthRoutes(router: Router) {
 
       const { username, password } = parseResult.data;
 
+      console.log("🔍 Looking up user:", username);
       const user = await findUserByUsername(username);
       
       if (!user) {
+        console.log("❌ User not found:", username);
         throw new HttpError(401, "Credenciales inválidas");
       }
 
+      console.log("✅ User found, verifying password...");
       const isValid = await verifyPassword(password, user.password);
       
       if (!isValid) {
+        console.log("❌ Invalid password for:", username);
         throw new HttpError(401, "Credenciales inválidas");
       }
 
+      console.log("✅ Password valid, generating token...");
       const token = signToken({ userId: user.id, userRole: user.role });
       
       res.cookie('auth_token', token, {
@@ -46,6 +53,7 @@ export function registerAuthRoutes(router: Router) {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
       
+      console.log("✅ Login successful for:", username);
       res.json({
         id: user.id,
         username: user.username,

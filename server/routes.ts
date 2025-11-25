@@ -312,8 +312,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(err.status).json({ error: err.message });
     }
 
-    console.error("Unexpected error", err);
-    res.status(500).json({ error: "Error interno del servidor" });
+    console.error("Unexpected error:", err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ 
+      error: "Error interno del servidor",
+      details: process.env.NODE_ENV !== 'production' ? errorMessage : undefined
+    });
   });
 
   return createServer(app);
