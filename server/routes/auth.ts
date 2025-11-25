@@ -18,19 +18,26 @@ export function registerAuthRoutes(router: Router) {
   router.post(
     "/auth/login",
     asyncHandler(async (req, res) => {
+      console.log("[AUTH] Login attempt:", req.body?.username);
+      
       const parseResult = credentialsSchema.safeParse(req.body);
       if (!parseResult.success) {
+        console.log("[AUTH] Validation failed:", parseResult.error.issues);
         throw new HttpError(400, parseResult.error.issues.map((issue) => issue.message).join("; "));
       }
 
       const { username, password } = parseResult.data;
 
       const user = await findUserByUsername(username);
+      console.log("[AUTH] User found:", user ? user.id : "NOT FOUND");
+      
       if (!user) {
         throw new HttpError(401, "Credenciales inválidas");
       }
 
       const isValid = await verifyPassword(password, user.password);
+      console.log("[AUTH] Password valid:", isValid);
+      
       if (!isValid) {
         throw new HttpError(401, "Credenciales inválidas");
       }
