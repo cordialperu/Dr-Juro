@@ -124,4 +124,43 @@ export function registerDoctrinaRoutes(router: Router) {
       }
     }),
   );
+
+  // Nueva ruta POST para búsqueda de doctrina
+  router.post(
+    "/doctrinas/search",
+    asyncHandler(async (req, res) => {
+      const { query, type } = req.body;
+
+      if (!query || typeof query !== "string" || query.trim().length === 0) {
+        throw new HttpError(400, "Debes proporcionar un término de búsqueda.");
+      }
+
+      const searchType = type || 'tema';
+
+      // Por ahora retornamos resultados mock
+      // TODO: Buscar en la base de datos real de doctrinas
+      const mockResults = [
+        {
+          id: "1",
+          titulo: `Doctrina sobre ${query}`,
+          autor: "Dr. Juan Pérez",
+          obra: "Derecho Procesal Penal Peruano",
+          articulo: "Artículo 123",
+          extracto: `Análisis doctrinal sobre ${query} en el contexto del derecho peruano...`,
+          tipo: searchType
+        },
+        {
+          id: "2",
+          titulo: `Comentarios sobre ${query}`,
+          autor: "Dra. María García",
+          obra: "Comentarios al Código Penal",
+          articulo: "Artículo 456",
+          extracto: `Interpretación doctrinal de ${query} según jurisprudencia reciente...`,
+          tipo: searchType
+        }
+      ];
+
+      res.json({ results: mockResults, query, type: searchType });
+    }),
+  );
 }

@@ -14,6 +14,7 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  role: varchar("role", { length: 20 }).default("abogado").notNull(), // admin, abogado, asistente
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -25,8 +26,35 @@ export const insertUserSchema = createInsertSchema(users).pick({
 // Clients Table
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(), // Usuario propietario del cliente
   name: text("name").notNull(),
   contactInfo: text("contact_info"),
+  // Campos OBLIGATORIOS de contacto DEL CLIENTE (quien paga/contrata)
+  email: varchar("email", { length: 255 }).notNull(), // OBLIGATORIO
+  whatsappPrimary: varchar("whatsapp_primary", { length: 20 }).notNull(), // OBLIGATORIO para coordinaciones
+  // Campos OPCIONALES de contacto
+  emailAssistant: varchar("email_assistant", { length: 255 }), // OPCIONAL: Email del asistente
+  whatsappAssistant: varchar("whatsapp_assistant", { length: 20 }), // OPCIONAL: WhatsApp del asistente
+  assistantName: varchar("assistant_name", { length: 255 }), // OPCIONAL: Nombre del asistente
+  // DATOS DEL IMPUTADO (quien tiene el cargo penal) - OPCIONAL
+  // Si el cliente es el mismo imputado, estos campos se dejan vacíos
+  imputadoName: varchar("imputado_name", { length: 255 }), // Nombre del imputado
+  imputadoDni: varchar("imputado_dni", { length: 20 }), // DNI del imputado
+  imputadoRelation: varchar("imputado_relation", { length: 100 }), // Relación con el cliente (hijo, cónyuge, etc.)
+  imputadoContact: varchar("imputado_contact", { length: 20 }), // Contacto del imputado
+  imputadoEmail: varchar("imputado_email", { length: 255 }), // Email del imputado
+  // Configuración de notificaciones
+  notifyClient: varchar("notify_client", { length: 10 }).default("true").notNull(), // "true" o "false" como string
+  notifyAssistant: varchar("notify_assistant", { length: 10 }).default("false").notNull(), // "true" o "false" como string
+  notifyImputado: varchar("notify_imputado", { length: 10 }).default("false").notNull(), // "true" o "false" - notificar al imputado
+  notes: text("notes"), // Notas adicionales
+  // Campos legacy
+  phonePrimary: varchar("phone_primary", { length: 20 }),
+  phoneSecondary: varchar("phone_secondary", { length: 20 }),
+  emailSecondary: varchar("email_secondary", { length: 255 }),
+  preferredContactMethod: varchar("preferred_contact_method", { length: 20 }).default("whatsapp"),
+  timezone: varchar("timezone", { length: 50 }).default("America/Lima"),
+  language: varchar("language", { length: 10 }).default("es"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -36,6 +64,9 @@ export const cases = pgTable("cases", {
   title: text("title").notNull(),
   description: text("description"),
   status: varchar("status", { length: 50 }).default("active").notNull(), // e.g., active, closed, pending
+  category: varchar("category", { length: 100 }), // laboral, civil, penal, etc.
+  priority: varchar("priority", { length: 20 }).default("medium"), // low, medium, high, critical
+  tags: jsonb("tags").default(sql`'[]'::jsonb`), // ["urgente", "audiencia"]
   clientId: varchar("client_id").references(() => clients.id),
   userId: varchar("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -157,8 +188,123 @@ export const consolidatedContext = pgTable("consolidated_context", {
   tokenCount: varchar("token_count", { length: 20 }), // para controlar límites del LLM
 });
 
+// Communication Templates Table (Plantillas de comunicación)
+export const communicationTemplates = pgTable("communication_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 255 }).notNull(),
+  category: varchar("category", { length: 50 }).notNull(), // reminder, update, request, notification, greeting
+  phase: varchar("phase", { length: 50 }), // investigation, strategy, meeting, followup, null para general
+  channel: varchar("channel", { length: 20 }).notNull(), // email, whatsapp, sms
+  subject: varchar("subject", { length: 500 }), // Para emails
+  bodyTemplate: text("body_template").notNull(),
+  variables: jsonb("variables"), // {clientName}, {lawyerName}, etc.
+  isActive: varchar("is_active", { length: 10 }).default("true").notNull(),
+  isSystem: varchar("is_system", { length: 10 }).default("false").notNull(), // Plantillas del sistema
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Communications Log Table (Registro de comunicaciones)
+export const communicationsLog = pgTable("communications_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").references(() => cases.id),
+  clientId: varchar("client_id").references(() => clients.id).notNull(),
+  templateId: varchar("template_id").references(() => communicationTemplates.id),
+  channel: varchar("channel", { length: 20 }).notNull(), // email, whatsapp, sms, phone
+  direction: varchar("direction", { length: 10 }).notNull(), // outbound, inbound
+  subject: varchar("subject", { length: 500 }),
+  body: text("body").notNull(),
+  recipient: varchar("recipient", { length: 255 }).notNull(),
+  sender: varchar("sender", { length: 255 }),
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, sent, delivered, read, failed
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  readAt: timestamp("read_at"),
+  errorMessage: text("error_message"),
+  metadata: jsonb("metadata"),
+  sentBy: varchar("sent_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Scheduled Reminders Table (Recordatorios programados)
+export const scheduledReminders = pgTable("scheduled_reminders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").references(() => cases.id),
+  clientId: varchar("client_id").references(() => clients.id).notNull(),
+  templateId: varchar("template_id").references(() => communicationTemplates.id),
+  reminderType: varchar("reminder_type", { length: 50 }).notNull(), // hearing, deadline, meeting, document_request, follow_up
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  scheduledFor: timestamp("scheduled_for").notNull(),
+  channel: varchar("channel", { length: 20 }).notNull(), // email, whatsapp, sms, all
+  recurrence: varchar("recurrence", { length: 20 }), // once, daily, weekly, monthly
+  status: varchar("status", { length: 20 }).default("scheduled").notNull(), // scheduled, sent, cancelled, failed
+  sentAt: timestamp("sent_at"),
+  errorMessage: text("error_message"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Case Events Table (Eventos del caso)
+export const caseEvents = pgTable("case_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").references(() => cases.id).notNull(),
+  eventType: varchar("event_type", { length: 50 }).notNull(), // phase_completed, document_uploaded, hearing_scheduled, etc.
+  eventData: jsonb("event_data"),
+  shouldNotifyClient: varchar("should_notify_client", { length: 10 }).default("false").notNull(),
+  notificationSent: varchar("notification_sent", { length: 10 }).default("false").notNull(),
+  notificationSentAt: timestamp("notification_sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Notes Table (Notas del caso)
+export const notes = pgTable("notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").references(() => cases.id).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  tags: jsonb("tags").default(sql`'[]'::jsonb`), // ["urgente", "audiencia", "pendiente"]
+  isPinned: varchar("is_pinned", { length: 10 }).default("false").notNull(),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Case Activity Table (Timeline de actividad)
+export const caseActivity = pgTable("case_activity", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").references(() => cases.id).notNull(),
+  activityType: varchar("activity_type", { length: 50 }).notNull(), // document_uploaded, phase_completed, note_added, etc.
+  description: text("description").notNull(),
+  metadata: jsonb("metadata"), // Información adicional en JSON
+  performedBy: varchar("performed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Chat Messages Table (Persistent chat history)
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").references(() => clients.id).notNull(),
+  role: varchar("role", { length: 20 }).notNull(), // user, assistant
+  content: text("content").notNull(),
+  metadata: jsonb("metadata"), // Additional context like tool usage, document references
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Legal Process V2 Table (Arquitectura 2.0)
+export const legalProcessV2 = pgTable("legal_process_v2", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").references(() => clients.id).notNull().unique(),
+  data: jsonb("data").notNull().default({}), // ProcessState completo
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Zod schemas for validation
-export const insertClientSchema = createInsertSchema(clients);
+// insertClientSchema omite userId (se asigna automáticamente en el backend)
+export const insertClientSchema = createInsertSchema(clients).omit({ userId: true });
 export const insertCaseSchema = createInsertSchema(cases);
 export const insertPrecedentSchema = createInsertSchema(precedents);
 export const insertDoctrinaSchema = createInsertSchema(doctrinas);
@@ -168,6 +314,14 @@ export const insertCaseProcessStateSchema = createInsertSchema(caseProcessState)
 export const insertDocumentFolderSchema = createInsertSchema(documentFolders);
 export const insertClientDocumentSchema = createInsertSchema(clientDocuments);
 export const insertConsolidatedContextSchema = createInsertSchema(consolidatedContext);
+export const insertCommunicationTemplateSchema = createInsertSchema(communicationTemplates);
+export const insertCommunicationsLogSchema = createInsertSchema(communicationsLog);
+export const insertScheduledReminderSchema = createInsertSchema(scheduledReminders);
+export const insertCaseEventSchema = createInsertSchema(caseEvents);
+export const insertNoteSchema = createInsertSchema(notes);
+export const insertCaseActivitySchema = createInsertSchema(caseActivity);
+export const insertLegalProcessV2Schema = createInsertSchema(legalProcessV2);
+export const insertChatMessageSchema = createInsertSchema(chatMessages);
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -192,3 +346,19 @@ export type ClientDocument = typeof clientDocuments.$inferSelect;
 export type InsertClientDocument = z.infer<typeof insertClientDocumentSchema>;
 export type ConsolidatedContext = typeof consolidatedContext.$inferSelect;
 export type InsertConsolidatedContext = z.infer<typeof insertConsolidatedContextSchema>;
+export type CommunicationTemplate = typeof communicationTemplates.$inferSelect;
+export type InsertCommunicationTemplate = z.infer<typeof insertCommunicationTemplateSchema>;
+export type CommunicationsLog = typeof communicationsLog.$inferSelect;
+export type InsertCommunicationsLog = z.infer<typeof insertCommunicationsLogSchema>;
+export type ScheduledReminder = typeof scheduledReminders.$inferSelect;
+export type InsertScheduledReminder = z.infer<typeof insertScheduledReminderSchema>;
+export type CaseEvent = typeof caseEvents.$inferSelect;
+export type InsertCaseEvent = z.infer<typeof insertCaseEventSchema>;
+export type Note = typeof notes.$inferSelect;
+export type InsertNote = z.infer<typeof insertNoteSchema>;
+export type CaseActivity = typeof caseActivity.$inferSelect;
+export type InsertCaseActivity = z.infer<typeof insertCaseActivitySchema>;
+export type LegalProcessV2 = typeof legalProcessV2.$inferSelect;
+export type InsertLegalProcessV2 = z.infer<typeof insertLegalProcessV2Schema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;

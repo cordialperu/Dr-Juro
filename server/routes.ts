@@ -205,7 +205,7 @@ const analyzeWithOpenAI = async (
   }
 
   try {
-    const response = await openai.chat.completions.create({
+const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
@@ -297,6 +297,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.use("/api", apiRouter);
+
+  // Fallback JSON para rutas de API inexistentes (evita que Vite devuelva HTML)
+  app.use("/api", (_req, res) => {
+    res.status(404).json({ error: "Ruta de API no encontrada" });
+  });
 
   app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
     if (res.headersSent) {

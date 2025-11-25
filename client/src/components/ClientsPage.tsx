@@ -1,33 +1,42 @@
 import { PlusCircle, Eye, ArrowRight, Loader2, CheckCircle2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useClientsQuery, useCreateClientMutation } from '@/hooks/useClients';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { insertClientSchema } from '@shared/schema';
+import { getClientColor } from '@/lib/clientColors';
+import { useAllClientsQuery, useCreateClientMutation } from '@/hooks/useClients';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { useSelectedClient } from '@/contexts/ClientContext';
+import { useClient } from '@/contexts/ClientContext';
+import { ClientForm } from './ClientForm';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 export function ClientsPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
   const [selectedClientForDetails, setSelectedClientForDetails] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [, navigate] = useLocation();
   
-  // Context para el cliente seleccionado globalmente
-  const { selectedClient, setSelectedClient } = useSelectedClient();
+  // Context unificado para el cliente
+  const { client: selectedClient, setClient: setSelectedClient } = useClient();
 
-  const { data: clients = [], isLoading, error } = useClientsQuery();
+  const { data: clientsResponse, isLoading, error } = useAllClientsQuery();
+  
+  // Extraer array de clientes (asegurarse de que siempre sea un array)
+  const clients = Array.isArray(clientsResponse) ? clientsResponse : [];
 
   // Consultar el progreso de todos los clientes
   const { data: progressData = {} } = useQuery({
@@ -55,26 +64,7 @@ export function ClientsPage() {
     return 'bg-green-500';
   };
 
-  const clientFormSchema = insertClientSchema.pick({
-    name: true,
-    contactInfo: true,
-  }).extend({
-    name: insertClientSchema.shape.name.min(1, 'Ingresa el nombre del cliente'),
-    contactInfo: insertClientSchema.shape.contactInfo?.optional() ?? z.string().optional(),
-  });
-
-  type ClientFormValues = z.infer<typeof clientFormSchema>;
-
-  const form = useForm<ClientFormValues>({
-    resolver: zodResolver(clientFormSchema),
-    defaultValues: {
-      name: '',
-      contactInfo: '',
-    },
-  });
-
   const handleSuccess = () => {
-    form.reset();
     setIsDialogOpen(false);
     toast({
       title: 'Cliente creado',
@@ -90,18 +80,12 @@ export function ClientsPage() {
     });
   };
 
-  const onSubmit = form.handleSubmit((values) => {
-    addClientMutation.mutate(
-      {
-        name: values.name,
-        contactInfo: values.contactInfo?.trim() ? values.contactInfo : undefined,
-      },
-      {
-        onSuccess: handleSuccess,
-        onError: handleError,
-      },
-    );
-  });
+  const handleSubmitClient = (values: any) => {
+    addClientMutation.mutate(values, {
+      onSuccess: handleSuccess,
+      onError: handleError,
+    });
+  };
 
   const handleDeleteClient = async (client: any) => {
     const confirmed = window.confirm(
@@ -154,40 +138,16 @@ export function ClientsPage() {
               <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Cliente
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Registrar Nuevo Cliente</DialogTitle>
             </DialogHeader>
-            <form onSubmit={onSubmit} className="grid gap-4 py-4" noValidate>
-              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-3">
-                <Label htmlFor="name" className="sm:text-right">Nombre</Label>
-                <Input
-                  id="name"
-                  {...form.register('name')}
-                  className="sm:col-span-3"
-                  required
-                />
-              </div>
-              {form.formState.errors.name && (
-                <p className="text-xs text-destructive sm:col-span-4 sm:text-right">{form.formState.errors.name.message}</p>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-3">
-                <Label htmlFor="contactInfo" className="sm:text-right">Contacto</Label>
-                <Input
-                  id="contactInfo"
-                  {...form.register('contactInfo')}
-                  className="sm:col-span-3"
-                />
-              </div>
-              {form.formState.errors.contactInfo && (
-                <p className="text-xs text-destructive sm:col-span-4 sm:text-right">{form.formState.errors.contactInfo.message}</p>
-              )}
-              <DialogFooter>
-                <Button type="submit" disabled={addClientMutation.isPending || form.formState.isSubmitting}>
-                  {addClientMutation.isPending ? 'Creando...' : 'Crear Cliente'}
-                </Button>
-              </DialogFooter>
-            </form>
+            <ClientForm 
+              onSubmit={handleSubmitClient}
+              onCancel={() => setIsDialogOpen(false)}
+              isSubmitting={addClientMutation.isPending}
+              submitLabel="Crear Cliente"
+            />
           </DialogContent>
         </Dialog>
       </div>
@@ -195,21 +155,53 @@ export function ClientsPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {clients.map((client) => {
           const progress = getClientProgress(client);
-          const progressColor = getProgressColor(progress.percentage);
+          const clientColor = getClientColor(client.id);
           
           return (
-            <Card key={client.id} className="hover:shadow-lg transition-shadow">
+            <Card 
+              key={client.id} 
+              className="hover:shadow-lg transition-shadow"
+              style={{
+                borderLeftWidth: '4px',
+                borderLeftColor: clientColor.primary,
+                borderLeftStyle: 'solid'
+              }}
+            >
               <CardHeader>
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg">{client.name}</CardTitle>
-                    {client.contactInfo && (
-                      <p className="text-xs text-muted-foreground mt-1">{client.contactInfo}</p>
-                    )}
+                  <div className="flex-1 flex items-center gap-3">
+                    <Avatar 
+                      className="h-10 w-10 flex-shrink-0 border-2 shadow-sm"
+                      style={{ 
+                        borderColor: clientColor.primary
+                      }}
+                      title={`Color identificador: ${client.name}`}
+                    >
+                      <AvatarFallback
+                        className="font-bold text-sm"
+                        style={{
+                          backgroundColor: clientColor.primary,
+                          color: 'white'
+                        }}
+                      >
+                        {getInitials(client.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <CardTitle className="text-lg">{client.name}</CardTitle>
+                      {client.contactInfo && (
+                        <p className="text-xs text-muted-foreground mt-1">{client.contactInfo}</p>
+                      )}
+                    </div>
                   </div>
                   <Badge 
-                    variant={progress.percentage === 0 ? "secondary" : "default"}
-                    className="ml-2"
+                    variant="outline"
+                    className="ml-2 flex-shrink-0"
+                    style={{
+                      backgroundColor: clientColor.light,
+                      color: clientColor.dark,
+                      borderColor: clientColor.primary
+                    }}
                   >
                     {progress.percentage}%
                   </Badge>
@@ -224,8 +216,11 @@ export function ClientsPage() {
                   </div>
                   <div className="relative h-2 bg-muted rounded-full overflow-hidden">
                     <div 
-                      className={`absolute top-0 left-0 h-full ${progressColor} transition-all duration-500`}
-                      style={{ width: `${progress.percentage}%` }}
+                      className="absolute top-0 left-0 h-full transition-all duration-500"
+                      style={{ 
+                        width: `${progress.percentage}%`,
+                        backgroundColor: clientColor.primary
+                      }}
                     />
                   </div>
                 </div>

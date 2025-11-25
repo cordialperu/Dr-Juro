@@ -7,6 +7,7 @@ import {
   findUserByUsername,
   verifyPassword,
 } from "../auth/service";
+import { signToken, verifyToken } from "../lib/jwt";
 
 const credentialsSchema = z.object({
   username: z.string().min(3, "Usuario demasiado corto"),
@@ -34,11 +35,21 @@ export function registerAuthRoutes(router: Router) {
         throw new HttpError(401, "Credenciales inválidas");
       }
 
-      req.session.userId = user.id;
+      const token = signToken({ userId: user.id, userRole: user.role });
+      
+      res.cookie('auth_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+      
       res.json({
         id: user.id,
         username: user.username,
+        role: user.role,
         createdAt: user.createdAt,
+        token,
       });
     }),
   );
@@ -46,18 +57,7 @@ export function registerAuthRoutes(router: Router) {
   router.post(
     "/auth/logout",
     asyncHandler(async (req, res) => {
-      if (!req.session.userId) {
-        res.status(204).end();
-        return;
-      }
-
-      await new Promise<void>((resolve, reject) => {
-        req.session.destroy((err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-
+      res.clearCookie('auth_token');
       res.status(204).end();
     }),
   );
@@ -65,11 +65,18 @@ export function registerAuthRoutes(router: Router) {
   router.get(
     "/auth/profile",
     asyncHandler(async (req, res) => {
-      if (!req.session.userId) {
+      const token = req.cookies.auth_token || req.headers.authorization?.replace('Bearer ', '');
+      
+      if (!token) {
         throw new HttpError(401, "No autenticado");
       }
 
-      const user = await findUserById(req.session.userId);
+      const payload = verifyToken(token);
+      if (!payload) {
+        throw new HttpError(401, "Token inválido o expirado");
+      }
+
+      const user = await findUserById(payload.userId);
       if (!user) {
         throw new HttpError(404, "Usuario no encontrado");
       }
@@ -77,6 +84,7 @@ export function registerAuthRoutes(router: Router) {
       res.json({
         id: user.id,
         username: user.username,
+        role: user.role,
         createdAt: user.createdAt,
       });
     }),
@@ -97,9 +105,16 @@ export function registerAuthRoutes(router: Router) {
       }
 
       const created = await createUser({ username, password });
-      req.session.userId = created.id;
+      const token = signToken({ userId: created.id, userRole: created.role });
+      
+      res.cookie('auth_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
 
-      res.status(201).json(created);
+      res.status(201).json({ ...created, token });
     }),
   );
 }

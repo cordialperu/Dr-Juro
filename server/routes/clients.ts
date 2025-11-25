@@ -9,40 +9,131 @@ import { sql, desc } from "drizzle-orm";
 export function registerClientRoutes(router: Router) {
   router.get(
     "/clients",
-    asyncHandler(async (_req, res) => {
+    asyncHandler(async (req, res) => {
+      // Verificar autenticación
+      if (!req.session || !req.session.userId) {
+        throw new HttpError(401, "No autenticado");
+      }
+
+      const userId = req.session.userId;
+
+      // Paginación: ?page=1&limit=20
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100); // Max 100
+      const offset = (page - 1) * limit;
+
       if (!db) {
         const allClients = await storage.getClients();
-        // Ordenar por fecha de creación descendente (más recientes primero)
-        allClients.sort((a, b) => {
+        // Filtrar por usuario
+        const userClients = allClients.filter(c => c.userId === userId);
+        // Ordenar por fecha de creación descendente
+        userClients.sort((a, b) => {
           const dateA = new Date(a.createdAt || 0).getTime();
           const dateB = new Date(b.createdAt || 0).getTime();
           return dateB - dateA;
         });
-        res.json(allClients);
+        
+        // Aplicar paginación manual para storage
+        const paginatedClients = userClients.slice(offset, offset + limit);
+        
+        res.json({
+          data: paginatedClients,
+          pagination: {
+            page,
+            limit,
+            total: userClients.length,
+            totalPages: Math.ceil(userClients.length / limit),
+          },
+        });
         return;
       }
 
-      // Ordenar por fecha de creación descendente (más recientes primero)
-      const allClients = await db
+      // Obtener total de registros del usuario
+      const [{ count }] = await db
+        .select({ count: sql<number>`cast(count(*) as integer)` })
+        .from(clients)
+        .where(sql`${clients.userId} = ${userId}`);
+
+      // Obtener página de resultados del usuario
+      const paginatedClients = await db
         .select()
         .from(clients)
-        .orderBy(desc(clients.createdAt));
-      res.json(allClients);
+        .where(sql`${clients.userId} = ${userId}`)
+        .orderBy(desc(clients.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      res.json({
+        data: paginatedClients,
+        pagination: {
+          page,
+          limit,
+          total: count,
+          totalPages: Math.ceil(count / limit),
+        },
+      });
+    }),
+  );
+
+  router.get(
+    "/clients/:id",
+    asyncHandler(async (req, res) => {
+      // Verificar autenticación
+      if (!req.session || !req.session.userId) {
+        throw new HttpError(401, "No autenticado");
+      }
+
+      const { id } = req.params;
+      const userId = req.session.userId;
+
+      if (!db) {
+        const client = await storage.getClient(id);
+        if (!client || client.userId !== userId) {
+          throw new HttpError(404, "Cliente no encontrado");
+        }
+        res.json(client);
+        return;
+      }
+
+      const [client] = await db
+        .select()
+        .from(clients)
+        .where(sql`${clients.id} = ${id} AND ${clients.userId} = ${userId}`)
+        .limit(1);
+
+      if (!client) {
+        throw new HttpError(404, "Cliente no encontrado");
+      }
+
+      res.json(client);
     }),
   );
 
   router.post(
     "/clients",
     asyncHandler(async (req, res) => {
+      // Verificar autenticación
+      if (!req.session || !req.session.userId) {
+        throw new HttpError(401, "No autenticado");
+      }
+
       try {
+        // Validar datos del body (sin userId)
         const validatedData = insertClientSchema.parse(req.body);
+        
+        // Agregar userId del usuario autenticado DESPUÉS de validar
+        const dataWithUserId = {
+          ...validatedData,
+          userId: req.session.userId
+        };
+
         if (!db) {
-          const newClient = await storage.createClient(validatedData);
+          const newClient = await storage.createClient(dataWithUserId);
           res.status(201).json(newClient);
           return;
         }
 
-        const [newClient] = await db.insert(clients).values(validatedData).returning();
+        const [newClient] = await db.insert(clients).values(dataWithUserId).returning();
         res.status(201).json(newClient);
       } catch (error) {
         if (error instanceof ZodError) {
@@ -50,6 +141,53 @@ export function registerClientRoutes(router: Router) {
         }
         throw error;
       }
+    }),
+  );
+
+  // Actualizar cliente
+  router.put(
+    "/clients/:id",
+    asyncHandler(async (req, res) => {
+      // Verificar autenticación
+      if (!req.session || !req.session.userId) {
+        throw new HttpError(401, "No autenticado");
+      }
+
+      const { id } = req.params;
+      const userId = req.session.userId;
+      const updateData = req.body;
+
+      // No permitir cambiar el userId
+      delete updateData.userId;
+
+      if (!db) {
+        const updatedClient = await storage.updateClient(id, updateData);
+        if (!updatedClient || updatedClient.userId !== userId) {
+          throw new HttpError(404, "Cliente no encontrado");
+        }
+        res.json(updatedClient);
+        return;
+      }
+
+      // Verificar que el cliente existe y pertenece al usuario
+      const [existingClient] = await db
+        .select()
+        .from(clients)
+        .where(sql`${clients.id} = ${id} AND ${clients.userId} = ${userId}`)
+        .limit(1);
+
+      if (!existingClient) {
+        throw new HttpError(404, "Cliente no encontrado");
+      }
+
+      // Actualizar
+      const [updatedClient] = await db
+        .update(clients)
+        .set(updateData)
+        .where(sql`${clients.id} = ${id}`)
+        .returning();
+
+      res.json(updatedClient);
     }),
   );
 

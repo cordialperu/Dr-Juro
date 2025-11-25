@@ -33,6 +33,23 @@ export function registerCaseRoutes(router: Router) {
     }),
   );
 
+  router.get(
+    "/clients/:clientId/cases",
+    asyncHandler(async (req, res) => {
+      const { clientId } = req.params;
+      
+      if (!db) {
+        const allCases = await storage.getCases();
+        const clientCases = allCases.filter(c => c.clientId === clientId);
+        res.json(clientCases);
+        return;
+      }
+
+      const clientCases = await db.select().from(cases).where(eq(cases.clientId, clientId));
+      res.json(clientCases);
+    }),
+  );
+
   router.post(
     "/cases",
     asyncHandler(async (req, res) => {

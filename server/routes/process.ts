@@ -21,7 +21,6 @@ export function registerProcessRoutes(router: Router) {
     "/cases/:caseId/process",
     asyncHandler(async (req, res) => {
       const { caseId } = req.params;
-      console.log("📥 GET /cases/:caseId/process - caseId:", caseId);
 
       if (db) {
         try {
@@ -40,14 +39,13 @@ export function registerProcessRoutes(router: Router) {
             .where(eq(caseDocuments.caseId, caseId))
             .orderBy(caseDocuments.uploadDate);
 
-          console.log("✅ Proceso cargado desde DB:", processState);
           res.json({
             processState: processState || null,
             documents,
           });
           return;
         } catch (error) {
-          console.error("⚠️ Error cargando proceso desde la base de datos. Usando almacenamiento en memoria", error);
+          console.error("Error cargando proceso desde la base de datos. Usando almacenamiento en memoria", error);
         }
       }
 
@@ -55,7 +53,6 @@ export function registerProcessRoutes(router: Router) {
       const processState = await storage.getCaseProcessState(caseId);
       const documents = await readDocumentsFromDisk(caseId);
 
-      console.log("✅ Proceso cargado desde storage:", processState);
       res.json({
         processState: processState ?? null,
         documents,
@@ -77,8 +74,6 @@ export function registerProcessRoutes(router: Router) {
         clientMeeting,
         followUp,
       } = req.body;
-
-      console.log("📤 POST /cases/:caseId/process - caseId:", caseId, "phase:", currentPhase, "completion:", completionPercentage);
 
       if (db) {
         try {
@@ -121,11 +116,10 @@ export function registerProcessRoutes(router: Router) {
               .returning();
           }
 
-          console.log("✅ Proceso guardado en DB:", result);
           res.json(result);
           return;
         } catch (error) {
-          console.error("⚠️ Error guardando proceso en base de datos. Usando almacenamiento en memoria", error);
+          console.error("Error guardando proceso en base de datos. Usando almacenamiento en memoria", error);
         }
       }
 
@@ -141,7 +135,6 @@ export function registerProcessRoutes(router: Router) {
         followUp,
       });
 
-      console.log("✅ Proceso guardado en storage:", saved);
       res.json(saved);
     })
   );

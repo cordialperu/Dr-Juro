@@ -1,7 +1,27 @@
 import { Client, InsertClient, Case, InsertCase, User, Doctrina, InsertDoctrina } from "@shared/schema";
 
-export type AuthProfile = Pick<User, "id" | "username" | "createdAt">;
+export type AuthProfile = Pick<User, "id" | "username" | "role" | "createdAt">;
 export type LoginInput = { username: string; password: string };
+
+// CSRF Token cache
+let csrfToken: string | null = null;
+
+async function getCsrfToken(): Promise<string> {
+  if (csrfToken) return csrfToken;
+  
+  try {
+    const res = await fetch('/api/csrf-token', { credentials: 'include' });
+    if (res.ok) {
+      const data = await res.json();
+      csrfToken = data.csrfToken || '';
+      return csrfToken || '';
+    }
+  } catch (error) {
+    console.warn('Failed to fetch CSRF token:', error);
+  }
+  
+  return '';
+}
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -47,18 +67,29 @@ const withCredentials: RequestInit = Object.freeze({
   credentials: "include",
 });
 
+async function getHeadersWithCsrf(): Promise<Record<string, string>> {
+  const token = await getCsrfToken();
+  return {
+    ...defaultHeaders,
+    ...(token ? { 'x-csrf-token': token } : {}),
+  };
+}
+
 export async function getClients(): Promise<Client[]> {
   const res = await fetch("/api/clients", {
     ...withCredentials,
   });
-  return handleResponse<Client[]>(res);
+  const data = await handleResponse<{ data: Client[] } | Client[]>(res);
+  // Manejar respuesta paginada o array directo
+  return Array.isArray(data) ? data : data.data || [];
 }
 
 export async function createClient(input: InsertClient): Promise<Client> {
+  const headers = await getHeadersWithCsrf();
   const res = await fetch("/api/clients", {
     ...withCredentials,
     method: "POST",
-    headers: defaultHeaders,
+    headers,
     body: JSON.stringify(input),
   });
   return handleResponse<Client>(res);
@@ -72,10 +103,11 @@ export async function getCases(): Promise<Case[]> {
 }
 
 export async function createCase(input: InsertCase): Promise<Case> {
+  const headers = await getHeadersWithCsrf();
   const res = await fetch("/api/cases", {
     ...withCredentials,
     method: "POST",
-    headers: defaultHeaders,
+    headers,
     body: JSON.stringify(input),
   });
   return handleResponse<Case>(res);
@@ -136,24 +168,29 @@ export async function deleteCase(id: string): Promise<{ success: boolean }> {
 }
 
 export async function getProfile(): Promise<AuthProfile> {
-  const res = await fetch("/api/auth/profile", {
+  const res = await fetch("/api/user/profile", {
     ...withCredentials,
   });
   return handleResponse<AuthProfile>(res);
 }
 
 export async function login(input: LoginInput): Promise<AuthProfile> {
-  const res = await fetch("/api/auth/login", {
+  const headers = await getHeadersWithCsrf();
+  const res = await fetch("/api/user/login", {
     ...withCredentials,
     method: "POST",
-    headers: defaultHeaders,
+    headers,
     body: JSON.stringify(input),
   });
+  
+  // Reset CSRF token after login
+  csrfToken = null;
+  
   return handleResponse<AuthProfile>(res);
 }
 
 export async function register(input: LoginInput): Promise<AuthProfile> {
-  const res = await fetch("/api/auth/register", {
+  const res = await fetch("/api/user/register", {
     ...withCredentials,
     method: "POST",
     headers: defaultHeaders,
@@ -163,7 +200,7 @@ export async function register(input: LoginInput): Promise<AuthProfile> {
 }
 
 export async function logout(): Promise<void> {
-  const res = await fetch("/api/auth/logout", {
+  const res = await fetch("/api/user/logout", {
     ...withCredentials,
     method: "POST",
   });

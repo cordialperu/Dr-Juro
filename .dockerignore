@@ -1,0 +1,17 @@
+node_modules
+.git
+.env
+*.log
+.DS_Store
+coverage
+.vscode
+dist
+.replit
+replit.nix
+.vercel
+.fly
+storage/*
+!storage/.gitkeep
+pdfs
+*.sqlite
+*.db

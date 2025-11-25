@@ -46,17 +46,38 @@ import {
   FileImage
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useCreateClientMutation } from "@/hooks/useClients";
+import { useCreateClientMutation, useClientQuery } from "@/hooks/useClients";
 import { useProcessState, useSaveProcessState } from "@/hooks/useProcessState";
 import { useAddCaseDocument, useUpdateDocumentNotes, useDeleteCaseDocument } from "@/hooks/useCaseDocuments";
 
-// Tipos para el proceso
-interface ClientInfo {
+// Tipos para el NUEVO proceso (Arquitectura 2.0)
+
+// Cap 1: Dashboard - Estado del caso
+interface CaseStatus {
+  caseNumber: string;
+  caseType: string; // "Penal", "Civil", etc.
+  currentStage: string; // "En Apelación", "En Juicio Oral", etc.
+  resolutionStatus: "en_tramite" | "absuelto_1ra" | "condenado_1ra" | "absuelto_2da" | "condenado_2da" | "casacion_fundada" | "casacion_infundada" | "archivado" | "sobreseimiento";
+  nextDeadline?: {
+    date: string;
+    description: string;
+  };
+}
+
+// Cap 2: Intervinientes
+interface Participant {
+  id: string;
   name: string;
-  phone: string;
-  email: string;
-  caseDescription: string;
-  clientId?: string;
+  role: "defensor" | "cliente" | "agraviado" | "fiscal" | "juez" | "vocal" | "testigo" | "perito";
+  contact?: string;
+  email?: string;
+  notes?: string;
+}
+
+// Cap 3: Expediente Digital (por etapa procesal)
+interface DocumentFolder {
+  stage: "general" | "investigacion" | "intermedia" | "juicio_oral" | "apelacion" | "casacion" | "ejecucion";
+  documents: UploadedDocument[];
 }
 
 interface UploadedDocument {
@@ -65,24 +86,78 @@ interface UploadedDocument {
   type: string;
   content: string;
   isProcessing: boolean;
-  category: "notifications" | "police-report" | "additional";
+  category: string;
   notes?: string;
   uploadDate?: string;
-  file?: File; // Almacenar el archivo para transcripción posterior
+  file?: File;
 }
+
+// Cap 4: Hitos Procesales (por Instancia)
+interface Milestone {
+  id: string;
+  instance: "primera" | "segunda" | "casacion";
+  stage: "investigacion" | "intermedia" | "juicio_oral" | "apelacion" | "casacion" | "ejecucion";
+  title: string;
+  date: string;
+  description: string;
+  isVerdict?: boolean; // Si es sentencia/veredicto
+  verdictResult?: "absolutoria" | "condenatoria" | "confirma" | "revoca" | "anula" | "fundado" | "infundado";
+  documentLink?: string;
+}
+
+// Cap 5: Estrategia
+interface CaseStrategy {
+  caseTheory: string;
+  factsAnalysis: string;
+  objectives: string[];
+  legalStrategy: string;
+  notes: string;
+}
+
+// Cap 6: Control Financiero
+interface FinancialControl {
+  honorarios: number;
+  gastos: number;
+  reparacionCivil: number;
+  payments: Array<{
+    date: string;
+    amount: number;
+    concept: string;
+  }>;
+}
+
+// Estado Principal del Proceso
+type ProcessPhase = "dashboard" | "intervinientes" | "expediente" | "hitos" | "estrategia" | "financiero" | "reportes";
+
+interface ProcessState {
+  currentPhase: ProcessPhase;
+  caseStatus: CaseStatus;
+  participants: Participant[];
+  documentFolders: DocumentFolder[];
+  milestones: Milestone[];
+  strategy: CaseStrategy;
+  financial: FinancialControl;
+  clientInfo: {
+    name: string;
+    phone: string;
+    email: string;
+    clientId?: string;
+  };
+}
+
+// Tipos legacy (mantener por compatibilidad temporal)
+interface ClientInfo {
+  name: string;
+  phone: string;
+  email: string;
+  caseDescription: string;
+  clientId?: string;
+}
+
 interface InvestigationProgress {
   notifications: string;
   policeReport: string;
   additionalDocuments: string;
-}
-
-interface CaseStrategy {
-  factsAnalysis: string;
-  caseTheory: string;
-  objectives: string[];
-  legalStrategy: string;
-  aiAnalysisResult?: string;
-  theoryDraft?: string;
 }
 
 interface ClientMeeting {
@@ -94,11 +169,7 @@ interface ClientMeeting {
   notes: string;
 }
 
-type ProcessPhase = "client-info" | "investigation" | "strategy" | "meeting" | "followup" | "completed";
-
-interface ProcessState {
-  currentPhase: ProcessPhase;
-  clientInfo: ClientInfo;
+interface LegacyProcessState {
   uploadedDocuments: UploadedDocument[];
   investigationProgress: InvestigationProgress;
   caseStrategy: CaseStrategy;
@@ -110,8 +181,12 @@ export function ProcessPage() {
   const [, navigate] = useLocation();
   const params = useParams();
   const caseId = params.caseId;
+  const clientId = params.clientId; // Obtener clientId de la ruta
   const { toast } = useToast();
   const createClientMutation = useCreateClientMutation();
+  
+  // Cargar datos del cliente si viene por ruta
+  const { data: existingClient, isLoading: isLoadingClient } = useClientQuery(clientId);
   
   // Hooks de persistencia
   const { data: processData, isLoading: isLoadingProcess } = useProcessState(caseId);
@@ -175,6 +250,25 @@ export function ProcessPage() {
   const [expandedField, setExpandedField] = useState<"notifications" | "police-report" | "additional" | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+  // Inicializar con cliente existente si viene por ruta
+  useEffect(() => {
+    if (existingClient && !processData?.processState) {
+      console.log("Cliente cargado desde ruta:", existingClient);
+      setProcessState((prev) => ({
+        ...prev,
+        currentPhase: "investigation", // Saltar directo a investigación
+        clientInfo: {
+          name: existingClient.name,
+          phone: existingClient.whatsappPrimary || existingClient.phonePrimary || "",
+          email: existingClient.email,
+          caseDescription: existingClient.contactInfo || "",
+          clientId: existingClient.id,
+        },
+        completionPercentage: 0, // Empezar desde 0 porque investigation es el inicio real
+      }));
+    }
+  }, [existingClient, processData]);
 
   // Cargar datos desde la base de datos cuando hay un caseId
   useEffect(() => {
@@ -367,7 +461,9 @@ export function ProcessPage() {
       // Crear cliente nuevo
       const newClient = await createClientMutation.mutateAsync({
         name: processState.clientInfo.name,
-        contactInfo: `Tel: ${processState.clientInfo.phone} | Email: ${processState.clientInfo.email}`,
+        email: processState.clientInfo.email || 'pendiente@example.com',
+        whatsappPrimary: processState.clientInfo.phone || '+51000000000',
+        contactInfo: processState.clientInfo.caseDescription || `Tel: ${processState.clientInfo.phone} | Email: ${processState.clientInfo.email}`,
       });
 
       const newState = {
@@ -1044,7 +1140,7 @@ V. RESULTADOS ESPERADOS:
     const newState = {
       ...processState,
       currentPhase: "strategy" as ProcessPhase,
-      completionPercentage: 35,
+      completionPercentage: 25,
     };
 
     setProcessState(newState);
@@ -1071,7 +1167,7 @@ V. RESULTADOS ESPERADOS:
     const newState = {
       ...processState,
       currentPhase: "meeting" as ProcessPhase,
-      completionPercentage: 60,
+      completionPercentage: 50,
     };
 
     setProcessState(newState);
@@ -1098,7 +1194,7 @@ V. RESULTADOS ESPERADOS:
     const newState = {
       ...processState,
       currentPhase: "followup" as ProcessPhase,
-      completionPercentage: 85,
+      completionPercentage: 75,
     };
 
     setProcessState(newState);
@@ -1181,44 +1277,40 @@ V. RESULTADOS ESPERADOS:
           </div>
 
           {/* Phase indicators */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 pt-4">
-            <div className={`flex items-center gap-2 p-3 rounded-lg border ${
-              processState.currentPhase === "client-info" 
-                ? "bg-primary/10 border-primary" 
-                : processState.completionPercentage > 0
-                ? "bg-green-50 dark:bg-green-950/20 border-green-500"
-                : "border-border"
-            }`}>
-              <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                processState.currentPhase === "client-info"
-                  ? "bg-primary text-primary-foreground"
-                  : processState.completionPercentage > 0
-                  ? "bg-green-500 text-white"
-                  : "bg-muted text-muted-foreground"
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-4">
+            {/* Ocultar fase cliente si ya tiene clientId */}
+            {!processState.clientInfo.clientId && (
+              <div className={`flex items-center gap-2 p-3 rounded-lg border ${
+                processState.currentPhase === "client-info" 
+                  ? "bg-primary/10 border-primary" 
+                  : "border-border"
               }`}>
-                {processState.completionPercentage > 0 && processState.currentPhase !== "client-info" 
-                  ? <CheckCircle className="h-4 w-4" />
-                  : <Users className="h-4 w-4" />
-                }
+                <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
+                  processState.currentPhase === "client-info"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}>
+                  <Users className="h-4 w-4" />
+                </div>
+                <span className="text-sm font-medium">Cliente</span>
               </div>
-              <span className="text-sm font-medium">Cliente</span>
-            </div>
+            )}
 
             <div className={`flex items-center gap-2 p-3 rounded-lg border ${
               processState.currentPhase === "investigation" 
                 ? "bg-primary/10 border-primary" 
-                : processState.completionPercentage >= 10
+                : processState.completionPercentage >= 25
                 ? "bg-green-50 dark:bg-green-950/20 border-green-500"
                 : "border-border"
             }`}>
               <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
                 processState.currentPhase === "investigation"
                   ? "bg-primary text-primary-foreground"
-                  : processState.completionPercentage >= 10
+                  : processState.completionPercentage >= 25
                   ? "bg-green-500 text-white"
                   : "bg-muted text-muted-foreground"
               }`}>
-                {processState.completionPercentage >= 10 && processState.currentPhase !== "investigation" 
+                {processState.completionPercentage >= 25 && processState.currentPhase !== "investigation" 
                   ? <CheckCircle className="h-4 w-4" />
                   : "1"
                 }
@@ -1229,18 +1321,18 @@ V. RESULTADOS ESPERADOS:
             <div className={`flex items-center gap-2 p-3 rounded-lg border ${
               processState.currentPhase === "strategy" 
                 ? "bg-primary/10 border-primary" 
-                : processState.completionPercentage >= 35
+                : processState.completionPercentage >= 50
                 ? "bg-green-50 dark:bg-green-950/20 border-green-500"
                 : "border-border"
             }`}>
               <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
                 processState.currentPhase === "strategy"
                   ? "bg-primary text-primary-foreground"
-                  : processState.completionPercentage >= 35
+                  : processState.completionPercentage >= 50
                   ? "bg-green-500 text-white"
                   : "bg-muted text-muted-foreground"
               }`}>
-                {processState.completionPercentage >= 35 && processState.currentPhase !== "strategy"
+                {processState.completionPercentage >= 50 && processState.currentPhase !== "strategy"
                   ? <CheckCircle className="h-4 w-4" />
                   : "2"
                 }
@@ -1251,18 +1343,18 @@ V. RESULTADOS ESPERADOS:
             <div className={`flex items-center gap-2 p-3 rounded-lg border ${
               processState.currentPhase === "meeting" 
                 ? "bg-primary/10 border-primary" 
-                : processState.completionPercentage >= 60
+                : processState.completionPercentage >= 75
                 ? "bg-green-50 dark:bg-green-950/20 border-green-500"
                 : "border-border"
             }`}>
               <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
                 processState.currentPhase === "meeting"
                   ? "bg-primary text-primary-foreground"
-                  : processState.completionPercentage >= 60
+                  : processState.completionPercentage >= 75
                   ? "bg-green-500 text-white"
                   : "bg-muted text-muted-foreground"
               }`}>
-                {processState.completionPercentage >= 60 && processState.currentPhase !== "meeting"
+                {processState.completionPercentage >= 75 && processState.currentPhase !== "meeting"
                   ? <CheckCircle className="h-4 w-4" />
                   : "3"
                 }
@@ -1731,6 +1823,55 @@ V. RESULTADOS ESPERADOS:
                 )}
               </TabsContent>
             </Tabs>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* INFO DEL CLIENTE (cuando ya está registrado) */}
+      {processState.clientInfo.clientId && processState.currentPhase !== "client-info" && (
+        <Card className="border-l-4 border-l-blue-500">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-blue-500" />
+                <CardTitle>Información del Cliente</CardTitle>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setPreviousPhase(processState.currentPhase);
+                  setProcessState(prev => ({
+                    ...prev,
+                    currentPhase: "client-info",
+                  }));
+                }}
+              >
+                Editar
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Nombre</p>
+                <p className="font-medium">{processState.clientInfo.name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">WhatsApp</p>
+                <p className="font-medium">{processState.clientInfo.phone}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Email</p>
+                <p className="font-medium">{processState.clientInfo.email}</p>
+              </div>
+              {processState.clientInfo.caseDescription && (
+                <div className="md:col-span-3">
+                  <p className="text-sm text-muted-foreground">Descripción del caso</p>
+                  <p className="text-sm mt-1">{processState.clientInfo.caseDescription}</p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

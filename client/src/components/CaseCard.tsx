@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar, FileText, User, Clock, MoreHorizontal } from "lucide-react"
+import { getClientColor } from "@/lib/clientColors"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +16,7 @@ export interface CaseCardProps {
   id: string
   title: string
   client: string
+  clientId?: string
   status: "active" | "pending" | "closed" | "review"
   priority: "high" | "medium" | "low"
   caseNumber: string
@@ -49,6 +51,7 @@ export function CaseCard({
   id,
   title,
   client,
+  clientId,
   status,
   priority,
   caseNumber,
@@ -60,6 +63,7 @@ export function CaseCard({
 }: CaseCardProps) {
   const [, navigate] = useLocation();
   const handleOpen = () => navigate(`/cases/${id}`);
+  const clientColor = clientId ? getClientColor(clientId) : null;
 
   return (
     <Card
@@ -74,6 +78,11 @@ export function CaseCard({
           handleOpen()
         }
       }}
+      style={clientColor ? {
+        borderLeftWidth: '4px',
+        borderLeftColor: clientColor.primary,
+        borderLeftStyle: 'solid'
+      } : {}}
     >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
@@ -117,8 +126,13 @@ export function CaseCard({
             <span className="text-sm text-muted-foreground">{statusLabels[status]}</span>
           </div>
           <Badge 
-            variant={priority === "high" ? "destructive" : priority === "medium" ? "secondary" : "outline"}
+            variant="outline"
             className="text-xs"
+            style={clientColor ? {
+              backgroundColor: clientColor.light,
+              color: clientColor.dark,
+              borderColor: clientColor.primary
+            } : {}}
           >
             {priorityLabels[priority]}
           </Badge>
@@ -163,6 +177,10 @@ export function CaseCard({
               event.stopPropagation();
               handleOpen();
             }}
+            style={clientColor ? {
+              backgroundColor: clientColor.primary,
+              color: 'white'
+            } : {}}
           >
             Abrir Expediente
           </Button>

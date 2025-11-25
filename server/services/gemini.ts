@@ -17,6 +17,12 @@ Lineamientos:
 
 const MAX_INPUT_LENGTH = 6000;
 const MAX_RESPONSE_TOKENS = 1024;
+const DEFAULT_CHAT_TEMPERATURE = 0.35;
+
+export type GeminiChatMessage = {
+  role: "user" | "model";
+  text: string;
+};
 
 export type GeminiJurisprudenceAnswer = {
   term: string;
@@ -117,4 +123,67 @@ export async function askGeminiAboutJurisprudence(term: string): Promise<GeminiJ
     term: trimmed,
     answer: cleanJurisprudenceResponse(answer),
   };
+}
+
+type GeminiGenerationConfig = {
+  temperature?: number;
+  maxOutputTokens?: number;
+};
+
+export async function generateGeminiResponse(
+  messages: GeminiChatMessage[],
+  config?: GeminiGenerationConfig,
+): Promise<string> {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    throw new HttpError(400, "Debes proporcionar mensajes para generar una respuesta.");
+  }
+
+  if (!GEMINI_API_KEY) {
+    throw new HttpError(500, "Falta configurar GEMINI_API_KEY en el servidor.");
+  }
+
+  const contents = messages.map((message) => ({
+    role: message.role,
+    parts: [{ text: trimPrompt(message.text) }],
+  }));
+
+  const body = {
+    contents,
+    generationConfig: {
+      temperature: config?.temperature ?? DEFAULT_CHAT_TEMPERATURE,
+      maxOutputTokens: config?.maxOutputTokens ?? MAX_RESPONSE_TOKENS,
+    },
+  };
+
+  const url = `${GEMINI_BASE_URL}/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    throw new HttpError(response.status, errorText || "No se pudo obtener respuesta de Gemini.");
+  }
+
+  const data = (await response.json()) as {
+    candidates?: Array<{
+      content?: {
+        parts?: Array<{ text?: string }>;
+      };
+    }>;
+  };
+
+  const firstCandidate = data.candidates?.[0]?.content?.parts ?? [];
+  const answer = firstCandidate.map((part) => part.text).filter(Boolean).join("\n").trim();
+
+  if (!answer) {
+    throw new HttpError(502, "Gemini devolvió una respuesta vacía.");
+  }
+
+  return answer;
 }

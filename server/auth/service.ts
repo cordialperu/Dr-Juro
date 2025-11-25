@@ -38,7 +38,7 @@ export async function createUser({ username, password }: { username: string; pas
     const [created] = await db
       .insert(users)
       .values({ username, password: passwordHash })
-      .returning({ id: users.id, username: users.username, createdAt: users.createdAt });
+      .returning({ id: users.id, username: users.username, role: users.role, createdAt: users.createdAt });
 
     return created;
   }

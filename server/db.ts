@@ -10,7 +10,11 @@ let poolInstance: pg.Pool | null = null;
 let dbInstance: NodePgDatabase<typeof schema> | null = null;
 
 if (databaseUrl) {
-  poolInstance = new Pool({ connectionString: databaseUrl });
+  poolInstance = new Pool({ 
+    connectionString: databaseUrl,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+    max: process.env.NODE_ENV === 'production' ? 10 : undefined // Limit connections in serverless
+  });
   dbInstance = drizzle(poolInstance, { schema });
 } else {
   console.warn(

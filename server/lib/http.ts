@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
 
-export type AsyncRouteHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
+export type AsyncRouteHandler = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
 
 export class HttpError extends Error {
   status: number;
@@ -14,7 +14,10 @@ export class HttpError extends Error {
 
 export const asyncHandler = (handler: AsyncRouteHandler) =>
   (req: Request, res: Response, next: NextFunction) => {
-    handler(req, res, next).catch(next);
+    // Allow route handlers to return a Promise that may resolve to a value
+    // (for example when returning the result of `res.json(...)`). We only
+    // need to ensure errors are forwarded to `next`.
+    Promise.resolve(handler(req, res, next)).catch(next);
   };
 
 export const formatZodError = (error: ZodError) =>

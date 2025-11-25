@@ -79,6 +79,22 @@ export function registerTaskRoutes(router: Router) {
   const database = shouldUseDatabase ? db! : null;
 
   router.get(
+    "/clients/:clientId/tasks",
+    asyncHandler(async (req, res) => {
+      const { clientId } = req.params;
+      
+      if (!shouldUseDatabase || !database) {
+        // Return empty array for now - tasks are typically associated with cases, not clients directly
+        res.json([]);
+        return;
+      }
+
+      // Return empty array - tasks are case-based, not client-based
+      res.json([]);
+    }),
+  );
+
+  router.get(
     "/tasks",
     asyncHandler(async (req, res) => {
       const statusQuery = typeof req.query.status === "string" ? req.query.status : undefined;
