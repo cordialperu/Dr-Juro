@@ -2,23 +2,18 @@ import { Router, Response } from "express";
 import { RequestWithSession } from "../types/express-session";
 import { legalProcessV2, clients } from "../../shared/schema";
 import { eq } from "drizzle-orm";
+import * as dbModule from "../db";
 
 const router = Router();
-
-// Lazy load db to ensure it's initialized
-const getDb = () => {
-  const { db } = require("../db");
-  return db;
-};
 
 // Obtener proceso legal v2 de un cliente
 router.get("/:clientId", async (req: RequestWithSession, res: Response) => {
   try {
     const clientId = req.params.clientId;
-    const db = getDb();
+    const db = dbModule.db;
     
     if (!db) {
-      console.error("Legal Process GET: db is null, DATABASE_URL:", !!process.env.DATABASE_URL);
+      console.error("Legal Process GET: db is null, DATABASE_URL exists:", !!process.env.DATABASE_URL);
       return res.status(500).json({ message: "Database not connected" });
     }
 
@@ -69,10 +64,10 @@ router.post("/:clientId", async (req: RequestWithSession, res: Response) => {
   try {
     const clientId = req.params.clientId;
     const processData = req.body;
-    const db = getDb();
+    const db = dbModule.db;
 
     if (!db) {
-      console.error("Legal Process POST: db is null, DATABASE_URL:", !!process.env.DATABASE_URL);
+      console.error("Legal Process POST: db is null, DATABASE_URL exists:", !!process.env.DATABASE_URL);
       return res.status(500).json({ message: "Database not connected" });
     }
 
@@ -118,7 +113,7 @@ router.post("/:clientId/participants", async (req: RequestWithSession, res: Resp
   try {
     const clientId = req.params.clientId;
     const participant = req.body;
-    const db = getDb();
+    const db = dbModule.db;
 
     if (!db) {
       return res.status(500).json({ message: "Database not connected" });
@@ -159,7 +154,7 @@ router.post("/:clientId/milestones", async (req: RequestWithSession, res: Respon
   try {
     const clientId = req.params.clientId;
     const milestone = req.body;
-    const db = getDb();
+    const db = dbModule.db;
 
     if (!db) {
       return res.status(500).json({ message: "Database not connected" });
@@ -200,7 +195,7 @@ router.post("/:clientId/payments", async (req: RequestWithSession, res: Response
   try {
     const clientId = req.params.clientId;
     const payment = req.body;
-    const db = getDb();
+    const db = dbModule.db;
 
     if (!db) {
       return res.status(500).json({ message: "Database not connected" });
