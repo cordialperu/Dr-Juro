@@ -100,6 +100,9 @@ async function createDemoUser() {
         .insert(clients)
         .values({
           name: clientData.name,
+          userId: userId,
+          email: 'demo@example.com',
+          whatsappPrimary: '+51999999999',
           contactInfo: clientData.contactInfo,
         })
         .returning();

@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { PrecedentCard } from "./PrecedentCard"
 import { useToast } from "@/hooks/use-toast"
+import jsPDF from "jspdf"
 
 interface DocumentAnalysisResult {
   documentSummary: string
@@ -35,7 +36,7 @@ interface DocumentAnalysisResult {
   confidence: number
 }
 
-export function DocumentAnalysis() {
+export function DocumentAnalysis({ caseId }: { caseId?: string }) {
   const [documentText, setDocumentText] = useState("")
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<DocumentAnalysisResult | null>(null)
@@ -173,6 +174,83 @@ export function DocumentAnalysis() {
     } catch (error) {
       console.error('Error copying text:', error)
     }
+  }
+
+  const handleDownloadReport = () => {
+    if (!analysisResult) return
+
+    const doc = new jsPDF()
+    
+    doc.setFontSize(18)
+    doc.text("REPORTE DE ANÁLISIS DE DOCUMENTO", 20, 20)
+    
+    doc.setFontSize(12)
+    doc.text(`Fecha: ${new Date().toLocaleDateString('es-PE')}`, 20, 35)
+    doc.text(`Confianza del análisis: ${analysisResult.confidence}%`, 20, 42)
+    
+    doc.setFontSize(14)
+    doc.text("Resumen del Documento:", 20, 55)
+    doc.setFontSize(10)
+    const summaryLines = doc.splitTextToSize(analysisResult.documentSummary, 170)
+    doc.text(summaryLines, 20, 62)
+    
+    let y = 62 + summaryLines.length * 5 + 10
+    
+    doc.setFontSize(14)
+    doc.text("Áreas Legales:", 20, y)
+    y += 7
+    doc.setFontSize(10)
+    analysisResult.legalAreas.forEach((area) => {
+      doc.text(`• ${area}`, 25, y)
+      y += 5
+    })
+    
+    y += 5
+    doc.setFontSize(14)
+    doc.text("Conceptos Legales Clave:", 20, y)
+    y += 7
+    doc.setFontSize(10)
+    analysisResult.keyLegalConcepts.slice(0, 8).forEach((concept) => {
+      doc.text(`• ${concept}`, 25, y)
+      y += 5
+    })
+    
+    y += 5
+    doc.setFontSize(14)
+    doc.text("Recomendaciones:", 20, y)
+    y += 7
+    doc.setFontSize(10)
+    analysisResult.recommendations.forEach((rec, idx) => {
+      const recLines = doc.splitTextToSize(`${idx + 1}. ${rec}`, 165)
+      doc.text(recLines, 25, y)
+      y += recLines.length * 5 + 2
+      if (y > 270) {
+        doc.addPage()
+        y = 20
+      }
+    })
+    
+    y += 5
+    doc.setFontSize(14)
+    doc.text("Riesgos Identificados:", 20, y)
+    y += 7
+    doc.setFontSize(10)
+    analysisResult.risks.forEach((risk) => {
+      const riskLines = doc.splitTextToSize(`• ${risk}`, 165)
+      doc.text(riskLines, 25, y)
+      y += riskLines.length * 5 + 2
+      if (y > 270) {
+        doc.addPage()
+        y = 20
+      }
+    })
+    
+    doc.save(`analisis_documento_${new Date().toISOString().split('T')[0]}.pdf`)
+    
+    toast({
+      title: "Reporte descargado",
+      description: "El PDF se ha guardado correctamente"
+    })
   }
 
   return (
@@ -442,7 +520,7 @@ export function DocumentAnalysis() {
             <Copy className="h-4 w-4 mr-2" />
             Copiar análisis
           </Button>
-          <Button variant="outline" data-testid="button-download-analysis">
+          <Button variant="outline" onClick={handleDownloadReport} data-testid="button-download-analysis">
             <Download className="h-4 w-4 mr-2" />
             Descargar reporte
           </Button>

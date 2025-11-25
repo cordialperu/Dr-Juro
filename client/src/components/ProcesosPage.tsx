@@ -1,4 +1,4 @@
-import { useSelectedClient } from '@/contexts/ClientContext';
+import { useClient } from '@/contexts/ClientContext';
 import { useLocation } from 'wouter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 
 export function ProcesosPage() {
-  const { selectedClient, clearSelectedClient } = useSelectedClient();
+  const { client: selectedClient, clearClient: clearSelectedClient } = useClient();
   const [, navigate] = useLocation();
 
   const { data: progressData } = useQuery({
@@ -34,7 +34,7 @@ export function ProcesosPage() {
             Selecciona un cliente desde la página de Clientes para gestionar sus procesos.
           </p>
         </div>
-        <Button onClick={() => navigate('/clients')}>
+        <Button onClick={() => navigate('/')}>
           <User className="h-4 w-4 mr-2" />
           Ir a Clientes
         </Button>
@@ -91,7 +91,7 @@ export function ProcesosPage() {
           size="sm"
           onClick={() => {
             clearSelectedClient();
-            navigate('/clients');
+            navigate('/');
           }}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />

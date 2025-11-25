@@ -1,4 +1,4 @@
-import { useSelectedClient } from '@/contexts/ClientContext';
+import { useClient } from '@/contexts/ClientContext';
 import { useLocation, useRoute } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { getClientColor } from '@/lib/clientColors';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -422,7 +423,7 @@ const truncateForTool = (text: string, limit = 4000): string => {
 };
 
 export function ProcesoFasePage() {
-  const { selectedClient, setSelectedClient } = useSelectedClient();
+  const { client: selectedClient, setClient: setSelectedClient } = useClient();
   const [, navigate] = useLocation();
   const [, params] = useRoute('/proceso/:clientId/:fase');
   const { toast } = useToast();
@@ -1696,6 +1697,8 @@ export function ProcesoFasePage() {
     return null;
   };
 
+  const clientColor = selectedClient ? getClientColor(selectedClient.id) : null;
+
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       {/* Header compacto */}
@@ -1710,9 +1713,18 @@ export function ProcesoFasePage() {
       </div>
 
       {/* Título y cliente */}
-      <div className="mb-4">
+      <div 
+        className="mb-4 p-4 rounded-lg border-l-4"
+        style={clientColor ? { 
+          borderLeftColor: clientColor.primary,
+          backgroundColor: `${clientColor.light}20`
+        } : undefined}
+      >
         <div className="flex items-center gap-2 mb-1">
-          <Icon className="h-5 w-5 text-muted-foreground" />
+          <Icon 
+            className="h-5 w-5"
+            style={clientColor ? { color: clientColor.primary } : undefined}
+          />
           <h2 className="text-xl font-semibold">{config.title}</h2>
         </div>
         <p className="text-sm text-muted-foreground">
@@ -1720,9 +1732,20 @@ export function ProcesoFasePage() {
         </p>
       </div>
 
-      <div className="mb-6 rounded-md border border-primary/20 bg-primary/5 px-4 py-3">
+      <div 
+        className="mb-6 rounded-md border px-4 py-3"
+        style={clientColor ? {
+          borderColor: `${clientColor.primary}33`,
+          backgroundColor: `${clientColor.light}15`
+        } : { borderColor: 'hsl(var(--primary) / 0.2)', backgroundColor: 'hsl(var(--primary) / 0.05)' }}
+      >
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs sm:text-sm text-muted-foreground">
-          <span className="font-semibold uppercase tracking-wide text-primary">Resumen del proceso</span>
+          <span 
+            className="font-semibold uppercase tracking-wide"
+            style={clientColor ? { color: clientColor.primary } : { color: 'hsl(var(--primary))' }}
+          >
+            Resumen del proceso
+          </span>
           <span>
             Avance: <span className="font-medium text-foreground">{seguimientoCompletion}%</span>
           </span>

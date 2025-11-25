@@ -13,6 +13,9 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
+// Tipo interno para crear cliente con userId (ya que InsertClient omite userId)
+type InsertClientWithUserId = InsertClient & { userId: string };
+
 // modify the interface with any CRUD methods
 // you might need
 
@@ -21,7 +24,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getClients(): Promise<Client[]>;
-  createClient(client: InsertClient): Promise<Client>;
+  createClient(client: InsertClientWithUserId): Promise<Client>;
   updateClient(id: string, update: Partial<Client>): Promise<Client | null>;
   deleteClient(id: string): Promise<boolean>;
   deleteClientsByName(name: string): Promise<{ deleted: number; keptIds: string[] }>;
@@ -100,6 +103,7 @@ export class MemStorage implements IStorage {
     const user: User = {
       ...insertUser,
       id,
+      role: 'abogado', // Default role for memory storage
       createdAt: new Date(),
     };
     this.users.set(id, user);
@@ -110,13 +114,38 @@ export class MemStorage implements IStorage {
     return Array.from(this.clients.values());
   }
 
-  async createClient(insertClient: InsertClient): Promise<Client> {
+  async getClient(id: string): Promise<Client | null> {
+    return this.clients.get(id) ?? null;
+  }
+
+  async createClient(insertClient: InsertClientWithUserId): Promise<Client> {
     const id = randomUUID();
     const client: Client = {
-      ...insertClient,
       id,
+      userId: insertClient.userId,
+      name: insertClient.name,
+      email: insertClient.email,
+      whatsappPrimary: insertClient.whatsappPrimary,
       contactInfo: insertClient.contactInfo ?? null,
       createdAt: new Date(),
+      phonePrimary: insertClient.phonePrimary ?? null,
+      phoneSecondary: insertClient.phoneSecondary ?? null,
+      whatsappAssistant: insertClient.whatsappAssistant ?? null,
+      emailAssistant: insertClient.emailAssistant ?? null,
+      emailSecondary: insertClient.emailSecondary ?? null,
+      assistantName: insertClient.assistantName ?? null,
+      imputadoName: insertClient.imputadoName ?? null,
+      imputadoDni: insertClient.imputadoDni ?? null,
+      imputadoRelation: insertClient.imputadoRelation ?? null,
+      imputadoContact: insertClient.imputadoContact ?? null,
+      imputadoEmail: insertClient.imputadoEmail ?? null,
+      notifyClient: insertClient.notifyClient ?? 'true',
+      notifyAssistant: insertClient.notifyAssistant ?? 'false',
+      notifyImputado: insertClient.notifyImputado ?? 'false',
+      preferredContactMethod: insertClient.preferredContactMethod ?? 'whatsapp',
+      timezone: insertClient.timezone ?? 'America/Lima',
+      language: insertClient.language ?? 'es',
+      notes: insertClient.notes ?? null,
     };
     this.clients.set(id, client);
     return client;
@@ -227,6 +256,9 @@ export class MemStorage implements IStorage {
       userId: insertCase.userId ?? null,
       createdAt: now,
       updatedAt: now,
+      category: insertCase.category ?? null,
+      priority: insertCase.priority ?? null,
+      tags: insertCase.tags ?? [],
     };
     this.cases.set(id, caseRecord);
     return caseRecord;
