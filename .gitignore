@@ -6,3 +6,5 @@ vite.config.ts.*
 *.tar.gz
 .npm-cache
 .env
+.vercel
+.env.save
