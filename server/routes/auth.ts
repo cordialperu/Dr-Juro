@@ -8,7 +8,6 @@ import {
   verifyPassword,
 } from "../auth/service";
 import { signToken, verifyToken } from "../lib/jwt";
-import bcrypt from "bcryptjs";
 
 const credentialsSchema = z.object({
   username: z.string().min(3, "Usuario demasiado corto"),
@@ -16,51 +15,23 @@ const credentialsSchema = z.object({
 });
 
 export function registerAuthRoutes(router: Router) {
-  // Debug endpoint to check user data
-  router.get(
-    "/auth/debug/:username",
-    asyncHandler(async (req, res) => {
-      const user = await findUserByUsername(req.params.username);
-      if (!user) {
-        return res.json({ found: false });
-      }
-      
-      const testPassword = "demo123";
-      const comparison = await bcrypt.compare(testPassword, user.password);
-      
-      res.json({
-        found: true,
-        userId: user.id,
-        username: user.username,
-        passwordHashLength: user.password?.length,
-        passwordHashStart: user.password?.substring(0, 20),
-        bcryptCompareResult: comparison
-      });
-    }),
-  );
-
   router.post(
     "/auth/login",
     asyncHandler(async (req, res) => {
-      console.log("[AUTH] Login attempt:", req.body?.username);
-      
       const parseResult = credentialsSchema.safeParse(req.body);
       if (!parseResult.success) {
-        console.log("[AUTH] Validation failed:", parseResult.error.issues);
         throw new HttpError(400, parseResult.error.issues.map((issue) => issue.message).join("; "));
       }
 
       const { username, password } = parseResult.data;
 
       const user = await findUserByUsername(username);
-      console.log("[AUTH] User found:", user ? user.id : "NOT FOUND");
       
       if (!user) {
         throw new HttpError(401, "Credenciales inválidas");
       }
 
       const isValid = await verifyPassword(password, user.password);
-      console.log("[AUTH] Password valid:", isValid);
       
       if (!isValid) {
         throw new HttpError(401, "Credenciales inválidas");
