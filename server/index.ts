@@ -9,6 +9,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { setupSession } from "./auth/session";
 import { doubleCsrfProtection, generateToken } from "./lib/csrf";
 import { logger, recordRequest, recordResponseTime, recordError, metrics } from "./lib/logger";
+import { verifyToken } from "./lib/jwt";
 
 const app = express();
 app.set("trust proxy", 1); // Trust first proxy (Vercel)
@@ -16,6 +17,28 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 setupSession(app);
+
+// JWT to Session middleware - extracts userId from JWT and adds to session
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // Skip if already has session userId
+  if (req.session?.userId) {
+    return next();
+  }
+
+  // Try to get token from cookie or Authorization header
+  const token = req.cookies.auth_token || req.headers.authorization?.replace('Bearer ', '');
+  
+  if (token) {
+    const payload = verifyToken(token);
+    if (payload) {
+      // Add userId to session for compatibility with existing routes
+      req.session.userId = payload.userId;
+      req.session.userRole = payload.userRole;
+    }
+  }
+  
+  next();
+});
 
 // Response time tracking
 app.use(responseTime((req, res, time) => {
