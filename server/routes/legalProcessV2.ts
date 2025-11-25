@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import { RequestWithSession } from "../types/express-session";
 import { legalProcessV2, clients } from "../../shared/schema";
 import { eq } from "drizzle-orm";
-import * as dbModule from "../db";
+import { getDb } from "../db";
 
 const router = Router();
 
@@ -10,7 +10,7 @@ const router = Router();
 router.get("/:clientId", async (req: RequestWithSession, res: Response) => {
   try {
     const clientId = req.params.clientId;
-    const db = dbModule.db;
+    const db = getDb();
     
     if (!db) {
       console.error("Legal Process GET: db is null, DATABASE_URL exists:", !!process.env.DATABASE_URL);
@@ -64,7 +64,7 @@ router.post("/:clientId", async (req: RequestWithSession, res: Response) => {
   try {
     const clientId = req.params.clientId;
     const processData = req.body;
-    const db = dbModule.db;
+    const db = getDb();
 
     if (!db) {
       console.error("Legal Process POST: db is null, DATABASE_URL exists:", !!process.env.DATABASE_URL);
@@ -113,7 +113,7 @@ router.post("/:clientId/participants", async (req: RequestWithSession, res: Resp
   try {
     const clientId = req.params.clientId;
     const participant = req.body;
-    const db = dbModule.db;
+    const db = getDb();
 
     if (!db) {
       return res.status(500).json({ message: "Database not connected" });
@@ -154,7 +154,7 @@ router.post("/:clientId/milestones", async (req: RequestWithSession, res: Respon
   try {
     const clientId = req.params.clientId;
     const milestone = req.body;
-    const db = dbModule.db;
+    const db = getDb();
 
     if (!db) {
       return res.status(500).json({ message: "Database not connected" });
@@ -195,7 +195,7 @@ router.post("/:clientId/payments", async (req: RequestWithSession, res: Response
   try {
     const clientId = req.params.clientId;
     const payment = req.body;
-    const db = dbModule.db;
+    const db = getDb();
 
     if (!db) {
       return res.status(500).json({ message: "Database not connected" });

@@ -54,10 +54,43 @@ async function autoMigrate() {
   }
 }
 
-// Initialize on first access
-initializeDb();
+// Export getters
+export function getDb() {
+  initializeDb();
+  return dbInstance;
+}
 
-// Export getters to ensure we get the current value
-export const pool = poolInstance;
-export const db = dbInstance;
-export const isDatabaseConfigured = () => dbInstance !== null;
+export function getPool() {
+  initializeDb();
+  return poolInstance;
+}
+
+// Create a proxy for legacy 'db' export that always returns the current instance
+const dbProxy = new Proxy({} as NodePgDatabase<typeof schema>, {
+  get(target, prop) {
+    initializeDb();
+    if (!dbInstance) {
+      throw new Error("Database not initialized - DATABASE_URL not set");
+    }
+    return (dbInstance as any)[prop];
+  }
+});
+
+// Create a proxy for legacy 'pool' export
+const poolProxy = new Proxy({} as pg.Pool, {
+  get(target, prop) {
+    initializeDb();
+    if (!poolInstance) {
+      throw new Error("Database not initialized - DATABASE_URL not set");
+    }
+    return (poolInstance as any)[prop];
+  }
+});
+
+// Legacy exports using proxies
+export const pool = poolProxy;
+export const db = dbProxy;
+export const isDatabaseConfigured = () => {
+  initializeDb();
+  return dbInstance !== null;
+};
