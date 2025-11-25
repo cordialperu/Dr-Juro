@@ -8,6 +8,7 @@ import {
   verifyPassword,
 } from "../auth/service";
 import { signToken, verifyToken } from "../lib/jwt";
+import bcrypt from "bcryptjs";
 
 const credentialsSchema = z.object({
   username: z.string().min(3, "Usuario demasiado corto"),
@@ -15,6 +16,29 @@ const credentialsSchema = z.object({
 });
 
 export function registerAuthRoutes(router: Router) {
+  // Debug endpoint to check user data
+  router.get(
+    "/auth/debug/:username",
+    asyncHandler(async (req, res) => {
+      const user = await findUserByUsername(req.params.username);
+      if (!user) {
+        return res.json({ found: false });
+      }
+      
+      const testPassword = "demo123";
+      const comparison = await bcrypt.compare(testPassword, user.password);
+      
+      res.json({
+        found: true,
+        userId: user.id,
+        username: user.username,
+        passwordHashLength: user.password?.length,
+        passwordHashStart: user.password?.substring(0, 20),
+        bcryptCompareResult: comparison
+      });
+    }),
+  );
+
   router.post(
     "/auth/login",
     asyncHandler(async (req, res) => {
